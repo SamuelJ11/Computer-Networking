@@ -32,10 +32,17 @@
 
 ## 1.1.2 A Services Description
 
-    • testing testing 123
+    • Internet applications are said to be distributed applications since are split across multiple machines that talk to each other but also run on end systems - they do not run in the packet switches in the network core
+
+    • End systems attached to the Internet provide a socket interface that specifies how a program running on one end system asks the Internet infrastructure to deliver data to a specific destination program running on another end system.
 
 ## 1.1.3 What is a Protocol
 
-    • testing testing 123
+    A. Network Protocols
+
+        • All activity in the Internet that involves two or more communicating remote entities is governed by a protocol
+
+            - for example, hardware-implemented protocols in two physically connected computers control the flow of bits on the "wire" between the two network interface cards
+       
 
 ## Chapter 1.2: The Network Edge
