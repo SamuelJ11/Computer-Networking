@@ -45,4 +45,57 @@
             - for example, hardware-implemented protocols in two physically connected computers control the flow of bits on the "wire" between the two network interface cards
        
 
-## Chapter 1.2: The Network Edge
+# Chapter 1.2: The Network Edge
+
+    • End systems are also referred to as hosts because they host (that is, run) application programs such as a Web browser or server program, an e-mail client program or an e-mail server program
+
+        - hosts are also further divided into two categories: clients and servers
+
+## 1.2.1 Access Networks
+
+    • The access network is the network that physically connects an end system to the first router (aka the edge router) on a path from the end system ot any other distant end system
+
+    A. Home Access: DSL, Cable, FTTH, Fixed Wireless, and LEO Satellites
+
+        • Today, the three most prevalent types of broadband residential access are (1) digital subscriber line (DSL), (2) cable and (3) fiber to the home (FTTH)
+
+            - With DSL, a customer's DSL modem converts the digital signals from a computer to high frequency analog tones for transmission over telephone wires to the telco's central office
+
+            - at the central office, the analog signals are translated back into digital format at the digital subscriber line access multiplexer (DSLAM) and sent to the ISP's network (here the telco IS the ISP)
+
+        • On the customer side, a splitter seperates the data and telephone signals arriving to the home and forwards the data and phone signals and sends the data into the Internet
+
+        • Generally if the residence is not located within 5 to 10 miles of the CO, the residence must resort to an alternative form of Internet access
+
+        • Cable Internet access makes use of the cable television company's existing cable television infrastructure
+
+            - fiber optics connect the cable head end (in the ISP) to neighborhood-level junctions (fiber nodes) from which traditional coaxial cable is then used to reach individual homes and apartments
+
+            - because both fiber and coaxial cable are employed in this system, it is often reffered to as hybrid fiber coax (HFC)
+
+        • As with a DSL modem, the cable modem termination system (CMTS) in the ISP converts the analog signal sent from the cable modems in many downstream homes back into digital format
+
+            - cable modems (like DSL modems) divide the HFC netowrk into two channels, a downstream and upstream channel, with asymmetric access speeds (downstream is usually faster)
+
+        • FTTH is the faster network technology currently available for residential broadband access
+
+            - there are two competing optical-distrubution network architecutures that perfom the splitting of fiber leaving the central office into individual customer-specific fibers:
+
+                -- active optical networks (AONs)
+
+                -- passive optical networks (PONs)
+
+            - see figure 1.7 for an overview of how PONs work
+
+        • Fixed wireless Internet (FWI) has also become a popular Internet access technology in which data is sent wirelessly from a provider's base station to the modem in the home
+
+        • Low-earth-orbit (LEO) satellites are increasingly being used for broadband Internet access for rural and remote areas (SpaceX's Starlink)
+
+    B. Ethernet and WiFI
+
+        • Ethernet is by far the most prevalent LAN access technology in corportate, university and home networks
+
+        • Increasingly, however, people are accessing the Internet wirelessly from laptops, smartphones, tablets, and other “things” using wireless access points (which in turn are connected to the wired internet)
+
+    C. Wide-Area Wireless Acess: 4G and 5G
+
