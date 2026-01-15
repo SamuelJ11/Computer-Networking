@@ -99,3 +99,62 @@
 
     C. Wide-Area Wireless Acess: 4G and 5G
 
+        • Mobile devices employ the same wireless infrastructure used for cellular telephony to send/receive packets through a base station that is operated by the cellular network provider.
+
+## 1.2.2 Physical Media
+
+    • Physical media fall into two categories:
+
+        - guided media: the waves are guided along a solid medium, such as a fiber-optic or coax cable
+
+        - unguided media: the waves propogate in the atmosphere and in outerspace
+
+        A. Twisted-Pair Copper Wire
+
+            • More than 99 percent of the wired connections from the telephone handset ot the local telephone switch use twisted-pair copper wire
+
+            • Consists of two insulated copper wires arranged in a regular spiral pattern (they are twisted together to reduce the electrical interference from similar pairs close by)
+
+                - typically, a number of pairs are bundled together in a cable by wrapping them in a protective shield (UTP is commonly used for networks within a building)
+
+        B. Coaxial Cable
+
+            • Like twisted pair, coaxial cable consists of two copper conductors, but the two conductors are concentric rather than parallel.
+
+            • Coaxial cable is quite common in cable television systems and cable Internet access, where the transmitter shifts the digital signal to a specific analog frequency band, which is then sent from the transmitter to one or more recievers.
+
+                - can be used as a guided shared medium
+
+        C. Fiber Optics
+
+            • An optical fiber is a thin, flexible medium that conducts pulses of light, with each pulse representing a bit
+
+                - immune to electromagnetic interference, have very low signal attenuation up to 100 kilometers, and are very hard to tap
+
+            • The Optical Carrier (OC) standard link speeds range from 51.8 Mbps to 39.8 Gbps these specifications are often referred to as n x 51.8 Mbps:
+
+                - ex. OC-1, OC-3, OC-12, OC-24, OC-48, OC-96, OC-192, OC-768
+
+        D. Terrestrial Radio Channels
+
+            • Can be broadly classified into three groups:
+
+                (1) those that operate over very short distance (1-2 meters)
+                (2) those that operate in local areas (10 to a few hundred meters)
+                (3) those that operate in the wide area, spanning tens of kilometers
+
+        E. Satellite Radio Channels
+
+            • A communication satellite links two or more Earth-based microwave transmitter/receivers, known as ground stations. 
+            
+                - the satellite receives transmissions on one frequency band, regenerates the signal using a repeater, and transmits the signal on another frequency
+
+            • Two types of satellites are used in communications: 
+            
+                - geostationary satellites permanently remain above the same spot on Earth, and are the central component of the global positioning system (GPS)
+
+                - LEO satellites are placed much closer to Earth and do not remain permanently above one spot on Earth are increasingly used for Internet access particularly in remote areas 
+
+
+
+    
