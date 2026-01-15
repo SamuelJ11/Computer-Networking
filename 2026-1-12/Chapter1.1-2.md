@@ -1,5 +1,3 @@
-# Chapter 1.1: What is the Internet
-
 ## 1.1.1 A Nuts and Bolts Description
 
     • Devices that connect to the internet are called "hosts" or "end systems:
