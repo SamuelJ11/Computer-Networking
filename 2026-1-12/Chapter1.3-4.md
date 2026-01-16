@@ -38,16 +38,29 @@
 
         • In the Internet, every end system has an address called an IP address.
 
-            - when a source end system watns to send a packet to a destination end system, the source includes the destination's IP address in the packet's header
+            - when a source end system wants to send a packet to a destination end system, the source includes the destination's IP address in the packet's header
 
             - when a packet arrives at a router, the router examines a portion of the packet's destination address and forwards the packet to an adjacent router
 
         • Each router has a forwarding table that maps destination addresses to that router's outbound links
 
-            - the router examiens the address and searches its forwarding table to find the appropriate outbound link
+            - the router examines the address and searches its forwarding table to find the appropriate outbound link
 
         • the Internet has a number of special routing protocols tha tare used to automatically set the forwarding tables
 
 ## 1.3.2 Circuit Switching
+
+    • In cicruit-switched networks, the resources needed along a path (buffers, link transmission rate, etc) to provide for communication between the end systems are reserved for the duration of the communication session between the end systems.
+
+        - in packet-switched networks, these resources are not reserved
+
+    • Telephone networks are examples of circuilt-switched networks as the switches on the path between the sender and receiver maintain connection state (called a circuit) for that connection
+
+        - when the network establishes the circuit, a given transmission rate has been reserved for this sender-to-reciever connection at a guaranteed constant rate
+
+    A. Multiplexing in Circuit-Switched Networks
+
+        • 
+
 
         
