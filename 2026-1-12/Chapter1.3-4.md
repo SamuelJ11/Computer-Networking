@@ -165,6 +165,38 @@
 
 ## 1.3.3 A Network of Networks
 
+    • ISPs themselves must be interconnected, which is done by creating a network of networks.
+
+    • In reality, although some ISPs do have impressive global coverage and do directly connect with many access ISPs, no ISP has presence in each and every city in the world.
+    
+        - instead, in any given region, there may be a regional ISP to which the access ISPs in the region connect
+
+        - each regional ISP connects to tier-1 ISPs (of which there are approximately twelve)
+
+    • In this hierarchy, each access ISP pays the regional ISP to which it connects, and each regional ISP pays the tier-1 ISP to which it connects.
+
+    • To build a network that more closely resembles today’s Internet, we must add points of presence (PoPs), multi-homing, peering, and Internet exchange points (IXPs)
+
+        - PoPs are groups of one or more routers in the provider's network where customer ISPs can connect into the provider ISP by leasing a high-speed link from a third-party telecommunications provider
+        
+            -- these exist in all levels of the hierarchy except for the bottom (access ISP) level
+
+        - any ISP (except for tier-1 ISPs) may choose to multi-home (connect to two or more provider ISPs) providing redundancy in case one provider has a failure
+
+        - a pair of nearby ISPs at the same level of the hierarch can peer (directly connect thier networks together) so that all the traffic between them passes over the direct connection rather than through upstream intermediaries, reducing the cost paid to the provider ISPs.
+
+        - a third-party company can create an IXP, which is a meeting point where multiple ISPs can peer together
+
+            -- these are typically in a stand-alone building with its own switches, and there are over 600 IXPs in the Internet today
+
+    • Finally we can add to this network structure one more time by introducing content-provider networks.
+
+        - Google is a great example, which has over 20 major data centers distributed across North America, Europe, Asia and South America
+
+        - the smaller data centers are often located within IXPs, and all of them are interconnected via Google's private TCP/IP network (seperate from the public internet)
+    
+
+
 
 
 
