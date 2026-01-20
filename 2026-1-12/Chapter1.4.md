@@ -62,6 +62,36 @@
 
 ## 1.4.3 End to End Delay
 
+    • Assuming there are N - 1 routers between the source host and the destination host, and the network is uncongested (no queuing delay), then we arrive at the total nodal delay (end-to-end delay) with the formula below:
 
+        - dend-to-end = N(dproc + dtrans + dprop)
 
+    A. Traceroute
 
+        • Traceroute is a simple program that can run in any Internet host, whereby the program sends a series of special packets into the network, with each packet addressed to the final destination. 
+        
+            - the first of these packets is marked , the second is marked , and so on
+            
+            - whenever a router between the source and destination receives one of these special packets, it decrements the marking by one and then forwards the packet along its way
+            
+            - however, if at a router the marking gets decremented to zero, the router does not forward the packet toward its destination, but instead sends a message back to the source
+
+            - after receiving the message from the host, the source stops sending these special packets
+
+            * basically, each packet has a hop limit (called the TTL), and each subsequent packet probes one more router along the path, and traceroute sends 3 packets per hop
+
+    B. End System, Application, and Other Delays
+
+        • Media packetization delay is another important delay present in video conferencing, where the sending side must first fill a packet with encoded digitized video and speech before passing the packet to the Internet.
+
+## Throughput in Computer Networks
+
+    • The instantaneous throughput at any instant of time is the rate (in bits/sec) at which the destination host is recieving the file from the source.
+
+    • The average througput is given by the F/T where F = the number of the bits, and T = time in seconds
+
+    • When examining figure 1.20, we see the throughtput is the transmission rate of the bottleneck link, given by min(Rs, Rc)
+
+        - thus the time it takes to transfer a file of size F from server to client is given as F/min(Rs, Rc)
+
+    • Figure 1.21 shows that the constraining factor for throughput in today’s Internet is typically the access network, as the core of the Internet is over-provisioned with high-speed links that experience little congestion
