@@ -36,12 +36,12 @@
 
 ## 1.1.3 What is a Protocol
 
-    A. Network Protocols
+### Network Protocols
 
-        • All activity in the Internet that involves two or more communicating remote entities is governed by a protocol
+    • All activity in the Internet that involves two or more communicating remote entities is governed by a protocol
 
-            - for example, hardware-implemented protocols in two physically connected computers control the flow of bits on the "wire" between the two network interface cards
-       
+        - for example, hardware-implemented protocols in two physically connected computers control the flow of bits on the "wire" between the two network interface cards
+    
 
 # Chapter 1.2: The Network Edge
 
@@ -53,51 +53,51 @@
 
     • The access network is the network that physically connects an end system to the first router (aka the edge router) on a path from the end system ot any other distant end system
 
-    A. Home Access: DSL, Cable, FTTH, Fixed Wireless, and LEO Satellites
+### Home Access: DSL, Cable, FTTH, Fixed Wireless, and LEO Satellites
 
-        • Today, the three most prevalent types of broadband residential access are (1) digital subscriber line (DSL), (2) cable and (3) fiber to the home (FTTH)
+    • Today, the three most prevalent types of broadband residential access are (1) digital subscriber line (DSL), (2) cable and (3) fiber to the home (FTTH)
 
-            - With DSL, a customer's DSL modem converts the digital signals from a computer to high frequency analog tones for transmission over telephone wires to the telco's central office
+        - With DSL, a customer's DSL modem converts the digital signals from a computer to high frequency analog tones for transmission over telephone wires to the telco's central office
 
-            - at the central office, the analog signals are translated back into digital format at the digital subscriber line access multiplexer (DSLAM) and sent to the ISP's network (here the telco IS the ISP)
+        - at the central office, the analog signals are translated back into digital format at the digital subscriber line access multiplexer (DSLAM) and sent to the ISP's network (here the telco IS the ISP)
 
-        • On the customer side, a splitter seperates the data and telephone signals arriving to the home and forwards the data and phone signals and sends the data into the Internet
+    • On the customer side, a splitter seperates the data and telephone signals arriving to the home and forwards the data and phone signals and sends the data into the Internet
 
-        • Generally if the residence is not located within 5 to 10 miles of the CO, the residence must resort to an alternative form of Internet access
+    • Generally if the residence is not located within 5 to 10 miles of the CO, the residence must resort to an alternative form of Internet access
 
-        • Cable Internet access makes use of the cable television company's existing cable television infrastructure
+    • Cable Internet access makes use of the cable television company's existing cable television infrastructure
 
-            - fiber optics connect the cable head end (in the ISP) to neighborhood-level junctions (fiber nodes) from which traditional coaxial cable is then used to reach individual homes and apartments
+        - fiber optics connect the cable head end (in the ISP) to neighborhood-level junctions (fiber nodes) from which traditional coaxial cable is then used to reach individual homes and apartments
 
-            - because both fiber and coaxial cable are employed in this system, it is often reffered to as hybrid fiber coax (HFC)
+        - because both fiber and coaxial cable are employed in this system, it is often reffered to as hybrid fiber coax (HFC)
 
-        • As with a DSL modem, the cable modem termination system (CMTS) in the ISP converts the analog signal sent from the cable modems in many downstream homes back into digital format
+    • As with a DSL modem, the cable modem termination system (CMTS) in the ISP converts the analog signal sent from the cable modems in many downstream homes back into digital format
 
-            - cable modems (like DSL modems) divide the HFC netowrk into two channels, a downstream and upstream channel, with asymmetric access speeds (downstream is usually faster)
+        - cable modems (like DSL modems) divide the HFC netowrk into two channels, a downstream and upstream channel, with asymmetric access speeds (downstream is usually faster)
 
-        • FTTH is the faster network technology currently available for residential broadband access
+    • FTTH is the faster network technology currently available for residential broadband access
 
-            - there are two competing optical-distrubution network architecutures that perfom the splitting of fiber leaving the central office into individual customer-specific fibers:
+        - there are two competing optical-distrubution network architecutures that perfom the splitting of fiber leaving the central office into individual customer-specific fibers:
 
-                -- active optical networks (AONs)
+            -- active optical networks (AONs)
 
-                -- passive optical networks (PONs)
+            -- passive optical networks (PONs)
 
-            - see figure 1.7 for an overview of how PONs work
+        - see figure 1.7 for an overview of how PONs work
 
-        • Fixed wireless Internet (FWI) has also become a popular Internet access technology in which data is sent wirelessly from a provider's base station to the modem in the home
+    • Fixed wireless Internet (FWI) has also become a popular Internet access technology in which data is sent wirelessly from a provider's base station to the modem in the home
 
-        • Low-earth-orbit (LEO) satellites are increasingly being used for broadband Internet access for rural and remote areas (SpaceX's Starlink)
+    • Low-earth-orbit (LEO) satellites are increasingly being used for broadband Internet access for rural and remote areas (SpaceX's Starlink)
 
-    B. Ethernet and WiFI
+### Ethernet and WiFI
 
-        • Ethernet is by far the most prevalent LAN access technology in corportate, university and home networks
+    • Ethernet is by far the most prevalent LAN access technology in corportate, university and home networks
 
-        • Increasingly, however, people are accessing the Internet wirelessly from laptops, smartphones, tablets, and other “things” using wireless access points (which in turn are connected to the wired internet)
+    • Increasingly, however, people are accessing the Internet wirelessly from laptops, smartphones, tablets, and other “things” using wireless access points (which in turn are connected to the wired internet)
 
-    C. Wide-Area Wireless Acess: 4G and 5G
+### Wide-Area Wireless Acess: 4G and 5G
 
-        • Mobile devices employ the same wireless infrastructure used for cellular telephony to send/receive packets through a base station that is operated by the cellular network provider.
+    • Mobile devices employ the same wireless infrastructure used for cellular telephony to send/receive packets through a base station that is operated by the cellular network provider.
 
 ## 1.2.2 Physical Media
 
@@ -107,51 +107,51 @@
 
         - unguided media: the waves propogate in the atmosphere and in outerspace
 
-        A. Twisted-Pair Copper Wire
+### Twisted-Pair Copper Wire
 
-            • More than 99 percent of the wired connections from the telephone handset ot the local telephone switch use twisted-pair copper wire
+    • More than 99 percent of the wired connections from the telephone handset ot the local telephone switch use twisted-pair copper wire
 
-            • Consists of two insulated copper wires arranged in a regular spiral pattern (they are twisted together to reduce the electrical interference from similar pairs close by)
+    • Consists of two insulated copper wires arranged in a regular spiral pattern (they are twisted together to reduce the electrical interference from similar pairs close by)
 
-                - typically, a number of pairs are bundled together in a cable by wrapping them in a protective shield (UTP is commonly used for networks within a building)
+        - typically, a number of pairs are bundled together in a cable by wrapping them in a protective shield (UTP is commonly used for networks within a building)
 
-        B. Coaxial Cable
+### Coaxial Cable
 
-            • Like twisted pair, coaxial cable consists of two copper conductors, but the two conductors are concentric rather than parallel.
+    • Like twisted pair, coaxial cable consists of two copper conductors, but the two conductors are concentric rather than parallel.
 
-            • Coaxial cable is quite common in cable television systems and cable Internet access, where the transmitter shifts the digital signal to a specific analog frequency band, which is then sent from the transmitter to one or more recievers.
+    • Coaxial cable is quite common in cable television systems and cable Internet access, where the transmitter shifts the digital signal to a specific analog frequency band, which is then sent from the transmitter to one or more recievers.
 
-                - can be used as a guided shared medium
+        - can be used as a guided shared medium
 
-        C. Fiber Optics
+### Fiber Optics
 
-            • An optical fiber is a thin, flexible medium that conducts pulses of light, with each pulse representing a bit
+    • An optical fiber is a thin, flexible medium that conducts pulses of light, with each pulse representing a bit
 
-                - immune to electromagnetic interference, have very low signal attenuation up to 100 kilometers, and are very hard to tap
+        - immune to electromagnetic interference, have very low signal attenuation up to 100 kilometers, and are very hard to tap
 
-            • The Optical Carrier (OC) standard link speeds range from 51.8 Mbps to 39.8 Gbps these specifications are often referred to as n x 51.8 Mbps:
+    • The Optical Carrier (OC) standard link speeds range from 51.8 Mbps to 39.8 Gbps these specifications are often referred to as n x 51.8 Mbps:
 
-                - ex. OC-1, OC-3, OC-12, OC-24, OC-48, OC-96, OC-192, OC-768
+        - ex. OC-1, OC-3, OC-12, OC-24, OC-48, OC-96, OC-192, OC-768
 
-        D. Terrestrial Radio Channels
+### Terrestrial Radio Channels
 
-            • Can be broadly classified into three groups:
+    • Can be broadly classified into three groups:
 
-                (1) those that operate over very short distance (1-2 meters)
-                (2) those that operate in local areas (10 to a few hundred meters)
-                (3) those that operate in the wide area, spanning tens of kilometers
+        (1) those that operate over very short distance (1-2 meters)
+        (2) those that operate in local areas (10 to a few hundred meters)
+        (3) those that operate in the wide area, spanning tens of kilometers
 
-        E. Satellite Radio Channels
+### Satellite Radio Channels
 
-            • A communication satellite links two or more Earth-based microwave transmitter/receivers, known as ground stations. 
-            
-                - the satellite receives transmissions on one frequency band, regenerates the signal using a repeater, and transmits the signal on another frequency
+    • A communication satellite links two or more Earth-based microwave transmitter/receivers, known as ground stations. 
+    
+        - the satellite receives transmissions on one frequency band, regenerates the signal using a repeater, and transmits the signal on another frequency
 
-            • Two types of satellites are used in communications: 
-            
-                - geostationary satellites permanently remain above the same spot on Earth, and are the central component of the global positioning system (GPS)
+    • Two types of satellites are used in communications: 
+    
+        - geostationary satellites permanently remain above the same spot on Earth, and are the central component of the global positioning system (GPS)
 
-                - LEO satellites are placed much closer to Earth and do not remain permanently above one spot on Earth are increasingly used for Internet access particularly in remote areas 
+        - LEO satellites are placed much closer to Earth and do not remain permanently above one spot on Earth are increasingly used for Internet access particularly in remote areas 
 
 
 

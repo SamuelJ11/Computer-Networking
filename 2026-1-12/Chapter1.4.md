@@ -6,25 +6,25 @@
 
     • Breifly recall that a packet can be transmitted on a link only if there is no other packet currently being transmitted on the link and if there are no other packets preceding it in the queue.
 
-    A. Types of Delay
+### Types of Delay
 
-        • There are four main types of delay affecting the performance of Internet applications:
+    • There are four main types of delay affecting the performance of Internet applications:
 
-            (1) processing delay - the time required to examine the packet's header and determine where to direct the packet, typically on the order of microsends or less in high-speed routers
+        (1) processing delay - the time required to examine the packet's header and determine where to direct the packet, typically on the order of microsends or less in high-speed routers
 
-            (2) queuing delay - the packet is waits to be transmitted onto the link, and the number of packets that an arriving packet might expect to find in the queue is a function of the intensity and nature of the traffic arriving at the queue
+        (2) queuing delay - the packet is waits to be transmitted onto the link, and the number of packets that an arriving packet might expect to find in the queue is a function of the intensity and nature of the traffic arriving at the queue
 
-            (3) transmission delay - recall the transmission delays is given by L (length of packet) / R (transmission rate of the link), and represents the amount of time required to push (that is, transmit) all of the packet’s bits into the link
+        (3) transmission delay - recall the transmission delays is given by L (length of packet) / R (transmission rate of the link), and represents the amount of time required to push (that is, transmit) all of the packet’s bits into the link
 
-            (4) propogation delay - the time required to propogate from the beginning of the link to the next router, dependent on the physcial medium of the link
+        (4) propogation delay - the time required to propogate from the beginning of the link to the next router, dependent on the physcial medium of the link
 
-                - calculated via d (the distance between two routers) / s (the propagation speed)
+            - calculated via d (the distance between two routers) / s (the propagation speed)
 
-    B. Comparing Transmission and Propagation Delay
+### Comparing Transmission and Propagation Delay
 
-        • The transmission delay has nothing to do with the distance between the two routers, and the propagation delay has nothing to do with the packet's length or the transmission rate of the link
+    • The transmission delay has nothing to do with the distance between the two routers, and the propagation delay has nothing to do with the packet's length or the transmission rate of the link
 
-        • The total nodal delay is given by the sum of the processing, queuing, transmission and propagation delays
+    • The total nodal delay is given by the sum of the processing, queuing, transmission and propagation delays
 
 ## 1.4.2 Queuing Delay and Packet Loss
 	​
@@ -52,13 +52,13 @@
 
         - figure 1.19 shows that as the traffic intensity approaches 1, the average queuing delay increases asymptotically
 
-    A. Packet Loss
+### Packet Loss
 
-        • Because the queue capacity is finite, packet delays do not really approach infinity as the traffic intensity approaches 1.
+    • Because the queue capacity is finite, packet delays do not really approach infinity as the traffic intensity approaches 1.
 
-            - instead, a packet can arrive to find a full queue, in which case a router will drop that packet
+        - instead, a packet can arrive to find a full queue, in which case a router will drop that packet
 
-        • This is why performace at a node is measured not only in terms of delay, but also in terms of the probability of packet loss
+    • This is why performace at a node is measured not only in terms of delay, but also in terms of the probability of packet loss
 
 ## 1.4.3 End to End Delay
 
@@ -66,23 +66,23 @@
 
         - dend-to-end = N(dproc + dtrans + dprop)
 
-    A. Traceroute
+### Traceroute
 
-        • Traceroute is a simple program that can run in any Internet host, whereby the program sends a series of special packets into the network, with each packet addressed to the final destination. 
+    • Traceroute is a simple program that can run in any Internet host, whereby the program sends a series of special packets into the network, with each packet addressed to the final destination. 
+    
+        - the first of these packets is marked , the second is marked , and so on
         
-            - the first of these packets is marked , the second is marked , and so on
-            
-            - whenever a router between the source and destination receives one of these special packets, it decrements the marking by one and then forwards the packet along its way
-            
-            - however, if at a router the marking gets decremented to zero, the router does not forward the packet toward its destination, but instead sends a message back to the source
+        - whenever a router between the source and destination receives one of these special packets, it decrements the marking by one and then forwards the packet along its way
+        
+        - however, if at a router the marking gets decremented to zero, the router does not forward the packet toward its destination, but instead sends a message back to the source
 
-            - after receiving the message from the host, the source stops sending these special packets
+        - after receiving the message from the host, the source stops sending these special packets
 
-            * basically, each packet has a hop limit (called the TTL), and each subsequent packet probes one more router along the path, and traceroute sends 3 packets per hop
+        * basically, each packet has a hop limit (called the TTL), and each subsequent packet probes one more router along the path, and traceroute sends 3 packets per hop
 
-    B. End System, Application, and Other Delays
+### End System, Application, and Other Delays
 
-        • Media packetization delay is another important delay present in video conferencing, where the sending side must first fill a packet with encoded digitized video and speech before passing the packet to the Internet.
+    • Media packetization delay is another important delay present in video conferencing, where the sending side must first fill a packet with encoded digitized video and speech before passing the packet to the Internet.
 
 ## Throughput in Computer Networks
 
