@@ -303,10 +303,67 @@
 
 ## 2.2.5: Browser Caching
 
-                    
+    • The most recent version of HTTP (HTTP/3) has been optimized to require just one RTT to request a web page in many cases.
+
+        - with browser caching, this can be reduced even further
+
+    • Browser caching is the process of locally storing the content of recently received Web objects in its browser cache
+
+        - but how does the browser know whether the object currently housed in the Web server has been modified since the copy was cached at the client?
+
+    • The 'Cache-Control' field in an HTTP response message lets the server specify how the content in the HTTP reply message should be cached:
+
+        - Cache-Control:no-store instructs the browser to not cache/store the content locally
+
+        - Cache-Control:max-age = n directive tells the browser to not cache the object longer than 'n' seconds
+
+    • The 'If-Modified-Since' field is an HTTP request header used in a conditional GET that tells the server the date and time when the browser last cached a copy of the requested object (cached timestamp).
+
+        - if the object has been modified since that time, the server sends the updated object; otherwise, it responds without sending the object, indicating that the cached copy is still valid
+
+        - in the case of the object not being modified since the date listed on the timestamp, then the Web server simply sends an emtpy entity body in the response message
+
+## 2.2.6: HTTP/2
+
+    • The primary goals for HTTP/2 (introduced in 2015) are to reduce percieved latency by enabling request and response multiplexing over a single TCP connection, provide request prioritization and server push, and provide efficient compression of HTTP header fields. 
+
+    • Recall that HTTP/1.1 uses persistent TCP connections, but developers of Web browsers discovered that sending all the objects in a Web page over a single TCP connection has a Head of Line (HOL) blocking problem (transmission of small objects are delayed as they wait in for larger ones to finish).
+
+        - HTTP/1.1 browsers typically work around this problem by opening multiple parallel TCP connections to reduce user-percieved delay
+
+    • Web browsers can also "cheat" the TCP congestion control by also opening multiple parallel TCP connections to grab a larger portion of the bottleneck link bandwidth. 
+
+    • Thus one of the primary goals of HTTP/2 is to reduce the number of parallel TCP connections for transporting single Web pages.
+
+### HTTP/2 Framing
+
+    • The HTTP/2 solution for HOL blocking is to break each message into small frames, and interleave the request and response messages on the same TCP connection.
+
+        - for example, after sending one frame of a large video, the server sends the first frame of each small object, then alternates the next video frame with the remaining small-object frames—so small objects arrive much sooner
+
+    • The ability to break down an HTTP message into independent frames, interleave them, and then reassemble them on the other end is the single most important enhancement of HTTP/2
+    
+    • The actual framing is done by the framing sub-layer of the HTTP/2 protocol:
+
+        - here the header field of the response becomes one frame, and the body is broken down into one or more additional frames
+
+        - the frames of the response are then interleaved by the framing sub-layer in the server with the frames of other responses and sent over the single persistent TCP connection
+
+### Response Message Prioritization and Server Pushing    
+
+    • Message prioritization allows developers to customize the relative priority of requests to better optimize application performance.
+
+        - when a client sends concurrent requests to a server, it can prioritize the responses it is requesting by assigning a weight between 1 and 256 to each message
+
+    • Using these weights, the server can send the frames for the responses with the highest priority first 
+
+    • Another feature of HTTP/2 is the ability for a server to send multiple responses for a single client request:
+    
+        - the server can "push" additional objects to the client, without the client having to request each one     
             
-            
-                            
+        - this is possible since the HTML base page indicates the objects that will be needed to fully render the Web page
+
+## 2.2.7: HTTP/3 and QUIC                   
               
 
 
