@@ -363,10 +363,44 @@
             
         - this is possible since the HTML base page indicates the objects that will be needed to fully render the Web page
 
-## 2.2.7: HTTP/3 and QUIC                   
+## 2.2.7: HTTP/3 and QUIC      
+
+    • HTTP/3, standardized in 2022 in RFC 9114 runs over UDP
+
+### The QUIC Transport Protocol
+
+    • HTTP/3 runs over the Quick UDP Internet Connections (QUIC) transport protocol
+
+        - strictly speaking, this isn't actually a transport layer protocol, but instead a sub-layer in the application layer that uses UDP to send and recieve packets over the Internet
+
+### Why a New “Transport Protocol”?
+
+    • Most HTTP/1/1 and HTTP/2 Web transactions today employ TLS running on top of TCP (see figure 2.11).
+
+        - TLS on top of TCP is commonly known as HTTPS
+
+    • One of the most important features of QUIC is that it gets rid of this double TCP-TLS handshake by absorbing the TLS handshake phase into the initial connection setup handshake.
               
+    • QUIC also re-examines the HOL blocking problem:
 
+        - since multiple messages are multiplexed over a single TCP connection for HTTP/2, a lost packet must be retrasmitted in accoradance with TCP, which delays all the other messages even if they don't depend on the lost packet
 
+        - QUIC solves this by using UDP instead of TCP, and then applying reliable data-transfer to each message separately within the same QUIC connection
 
+### QUIC Services
+
+    • The services provided by QUIC are as follows:
+
+        (1) built-in encryption: QUIC integrates  (which we will learn about in Chapter 8) directly into its protocol
+
+        (2) independent data streams: QUIC allows multiple streams (for example, multiple HTTP messages) to be sent simultaneously over a single QUIC connection
+
+        (3) 0-RTT handshakes: for returning clients, QUIC supports 0-RTT handshakes, allowing data to be sent immediately without waiting for a full connection handshake
+
+        (4) connection migration: QUIC supports connection migration, allowing connections to remain active if the client’s IP address changes 
+
+## HTTP/3: Running the Web over QUIC
+
+    • The only major change as compared with HTTP/2 is that instead of using a persistent TCP connection between client and server to send the HTTP messages, HTTP/3 uses a persistent QUIC connection
     
     
