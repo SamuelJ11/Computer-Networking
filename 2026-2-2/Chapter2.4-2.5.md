@@ -118,4 +118,90 @@
 
 # 2.5: Video Streaming and Content Distribution Networks
 
-    •
+## 2.5.1: Internet Video
+
+    • In streaming stored video applications, the underlying medium is prerecorded video, such as a movie, a television show, a prerecorded sporting event, or a prerecorded user-generated video (such as those commonly seen on YouTube). 
+    
+    • These prerecorded videos are placed on servers, and users send requests to the servers to view the videos on demand. Many Internet companies today provide streaming video, including, Netflix, YouTube (Google), Amazon, and TikTok.
+
+    • Video = fast pictures → pictures are pixels → pixels are bits → raw video is enormous → compression shrinks it by sacrificing quality → higher bitrate = better looking video.
+
+    • In order to provide continuous playout, the network must provide an average throughput to the streaming application that is at least as large as the bit rate of the compressed video.
+
+## 2.5.2: HTTP Streaming and Dash
+
+    • In HTTP streaming, the video is simply stored at an HTTP server as an ordinary file with a specific URL
+
+        - the server then sends the video file, within an HTTP response message, as quickly as the underlying network protocols and traffic conditions will allow
+
+    • On the client side, the bytes are collected in a client application buffer.
+
+        - once the number of bytes in this buffer exceeds a predetermined threshold, the client application begins playback
+        
+        — specifically, the streaming video application periodically grabs video frames from the client application buffer, decompresses the frames, and displays them on the user’s screen
+
+    • A major disadvantage with this method is that all clients receive the same encoding of the video, dispite the large variations in the amount of bandwidth available to a client.
+
+    • Dynamic Adaptive Streaming over HTTP (DASH) allows video to be encoded into several different bitrates and quality levels corresponding to the available network bandwidth.
+
+    • With DASH, each video version is stored in the HTTP server, each with a different URL.
+
+        - the HTTP server also has a manifest file, which provides a URL for each version along with its bit rate
+
+## 2.5.3: Content Distribution Networks
+
+    • In order to meet the challenge of distributing massive amounts of video data to users distributed around the world, almost all major video-streaming companies make use of Content Distribution Networks (CDNs).
+
+    • CDNs typically adopt one of two different server placement philosophies:
+
+        (1) Enter Deep: CDN servers are placed directly inside ISPs near users to improve speed and latency, but this creates massive operational complexity because there are thousands of small server locations to manage
+
+        (2) Bring Home: build large clusters at a smaller number in Internet Exchange Points (IXPs)
+
+    • Once its clusters are in place, the CDN replicates content across its clusters. 
+
+### CDN Operation
+
+    • Most CDNs take advantage of DNS to intercept and redirect requests (a simplified example of this iteraction is shown below)
+
+        (1) User visits NetCinema webpage and clicks the video link
+
+        (2) User’s computer asks for video.netcinema.com and sends a DNS query
+
+        (3) NetCinema’s authoritative DNS intercepts, sees “video” in the hostname and returns a hostname in KingCDN’s domain (e.g., a1105.kingcdn.com) instead of an IP
+
+        (4) KingCDN’s DNS resolves the hostname, LDNS (Local DNS) asks KingCDN DNS: “What IP should the client use?” and KingCDN returns the IP of the best content server for this user
+
+        (5) LDNS sends IP to user’s computer and now the client knows which CDN server to contact
+
+        (6) Client downloads the video, opens TCP connection to CDN server, issues HTTP GET for video
+
+            - if using DASH, server first sends a manifest file and client picks video chunks dynamically based on bandwidth
+
+### Cluster Selection Strategies
+
+    • Assigning clients to the geographically closest CDN cluster is simple and works okay for many users, but it can perform poorly because:
+
+        (1) physical closeness doesn’t always mean shortest/faster network path
+
+        (2) some clients use remote DNS servers, misleading the CDN
+
+        (3) internet conditions change over time, but this strategy doesn’t adapt
+
+    • In order to determine the best cluster for a client based on the current traffic conditions, CDNs can instead perform periodic real-time measurements of delay and loss performance between their clusters and clients by periodically sending probes (for example, ping messages or DNS queries) to all of the LDNSs around the world.
+
+### CDN Caching
+
+    • CDNs don’t store all content at every server location because that would be too costly and require too much storage.
+
+        - instead, each server location stores only a subset of content
+
+        - all the servers at a location working together like this are called a cache
+
+    • A CDN has at its disposal two fundamental strategies for placing video files (and other content) in its caches: push and pull
+
+        - in the push strategy, the CDN forecasts which videos will be in greatest demand at each of its locations and then sends to each of its locations the videos that it expects to be in highest demand for those locations
+
+        - in the pull strategy, the user gets redirected to a nearby cache in the CDN - if that cache has a copy of the video, then the cache streams the video to the user
+
+            - if there is a cache miss, the cache first retrieves the video from one the CDN’s central servers, stores the video in the local cache, and streams the video to the requesting user
