@@ -4,7 +4,7 @@
 
         - IP addresses consist of 4 bytes separated by periods and is organized hierachchically (as we scan the address from left to right, we obtain more and more specific information about where the host is located in the Internet)
 
-# 2.4.1: Services Provided by DNS
+## 2.4.1: Services Provided by DNS
 
     • The DNS is a distributed database implemented in a hierarchy of DNS servers AND an application-layer protocol that allows hosts to query the distributed database
 
@@ -36,7 +36,7 @@
 
             - here the server will respond with the entire set of IP addresses, but rotates the ordering of the addresses within each reply, distributing the traffic among the replicated servers
 
-# 2.4.2: Overview of How DNS Works
+## 2.4.2: Overview of How DNS Works
 
     • Suppose that some application (such as a Web browser or a mail client) running in a user’s host needs to translate a hostname to an IP address.
 
@@ -46,7 +46,7 @@
 
         (3) DNS in the user's host recieves a DNS replay message that provides the desired mapping, which is then passed ot the invoking application
 
-## A distributed, Hierachical Database
+### A distributed, Hierachical Database
 
     • DNS uses a large number of servers, organized in a hierarchical fashion and distributed around the world.
 
@@ -72,7 +72,7 @@
 
     • In a recursive DNS query, the client asks one server to do all the work, whereas in an iterative DNS query, each server gives partial answers ("I don't know, but ask this next server")
 
-## DNS Caching
+### DNS Caching
 
     • If a hostname/IP address pair is cached in a DNS server and another query arrives to the DNS server for the same hostname, the DNS server can provide the desired IP address, even if it is not authoritative for the hostname (aka, doesn't own that domain)
 
@@ -82,4 +82,40 @@
 
 ## 2.4.3: DNS Records and Messages
 
-    • 
+    • The DNS servers that together implement the DNS distributed database store resource records (RRs), including RRs that provide hostname-to-IP address mappings.
+
+        - these are four-tuples that contain the the following fields:
+
+        (Name, Value, Type, TTL)
+
+        - if 'Type' = A, then 'Name' is a hostname and 'Value' is the IP address for the hostname
+
+        - if 'Type' = NS, then 'Name' is a domain (such as foo.com) and 'Value' is the hostname of an authoritatiave DNS server that knows how to obtain the IP addresses for hosts in the domain.
+
+        - if 'Type' = CNAME, then 'Value' is a canonical hostname for the alias hostname 'Name'
+
+        - if 'Type' = MX, then 'Value' is the canonical name of a mail server that has an alias hostname 'Name;
+
+    • If a DNS server is authoritative for a particular hostname, then the DNS server will contain a Type A record for the hostname.
+
+    • If a server is not authoritative for a hostname, then the server will contain a Type NS record for the domain that includes the hostname.
+
+        - it will also contain a Type A record that provides the IP address of the DNS server in the  field of the NS record
+
+### DNS Messages
+
+    • See figure 2.19 and the following description for an overview of DNS queries and replies
+
+### Inserting Records into the DNS Database
+
+    • How do records get into the DNS database in the first place?
+
+    • The first step is to register a domain name at a registrar.
+
+    • Next, you need to provide the registrar with the names and IP addresses of you primary and secondary authoritative DNS servers
+
+        - for each of these two authoritative DNS servers, the registrar would then make sure that a Type NS and a Type A record are entered into the TLD com servers
+
+# 2.5: Video Streaming and Content Distribution Networks
+
+    •

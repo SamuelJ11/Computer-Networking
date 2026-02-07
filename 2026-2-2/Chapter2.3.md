@@ -18,7 +18,7 @@
 
         - after several days of failed attempts, the sender's mail server simply removes the email
 
-# 2.3.1: SMTP
+## 2.3.1: SMTP
 
     • SMTP is the principal application-layer protocol for Internet electronic mail.
 
@@ -30,7 +30,7 @@
 
     • SMTP does not normally use intermediate mail servers for sending mail, even when the two mail servers are located at opposite ends of the world. 
 
-# 2.3.2: Mail Message Formats
+## 2.3.2: Mail Message Formats
 
     • When an e-mail message is sent from one person to another, a header containing peripheral information precedes the body of the message itself.
 
@@ -44,7 +44,7 @@
         To: sjaboud@gmail.com
         Subject: This is a test
 
-# 2.3.3: Mail Access Protocols
+## 2.3.3: Mail Access Protocols
     
     • Typically the sender’s user agent does not dialogue directly with the recipient’s mail server:
         
