@@ -18,18 +18,23 @@ int main(int argc, char *argv[])
     
     struct sockaddr_in echoServAddr; /* Local address */ 
     struct sockaddr_in echoClntAddr; /* Client address */ 
-    unsigned short echoServPort; 
-    /* Server port */ 
+    unsigned short echoServPort; /* Server port */     
     unsigned int clntLen; /* Length of client address data structure */
 
-    if (argc != 2) /* Test for correct number of arguments */
+    if (argc == 2) /* Test for correct number of arguments */
     { 
-        fprintf(stderr, "Usage: %s <Server Port>\n", argv[0]) ; 
+        echoServPort = atoi(argv[1]); /* First arg: local port */
+    }
+    else if (argc == 1)
+    {
+        echoServPort = 5000; /* Default port if none specified */
+    }
+    else
+    {
+        fprintf(stderr, "Usage: %s [<Server Port>]\n", argv[0]) ; 
         exit(1);
-    } 
+    }
      
-    echoServPort = atoi(argv[1]); /* First arg: local port */ 
-
     /* Create socket for incoming connections */ 
     if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) 
         DieWithError( "socket () failed");
