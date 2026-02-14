@@ -89,7 +89,7 @@ void *client_thread_func(void *arg) {
          * It calculates the request rate based on total messages and RTT
          */
 
-        if ((recv(data->client_fd, recv_buf, MESSAGE_SIZE, 0)) <= 0)
+        if ((recv(data->client_fd, recv_buf, MESSAGE_SIZE, 0)) < 0)
         {
             DieWithError("recv() failed or connection closed prematurely");
         } 
@@ -142,10 +142,10 @@ void run_client() {
         } 
 
         /* Create the interest list (aka the epoll instance) for the client thread */
-        thread_data[i].epoll_fd = epoll_create(0);
+        thread_data[i].epoll_fd = epoll_create(10);
         if (thread_data[i].epoll_fd == -1) 
         {
-            DieWithError("failed to the created the epoll instance for client");
+            DieWithError("failed to created the epoll instance for client");
         }   
     }
     
@@ -215,7 +215,7 @@ void run_server() {
 
     /* Bind to the local address */ 
     if (bind(listenSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0) 
-        DieWithError ( "bind () failed"); 
+        DieWithError ("bind() failed"); 
 
     /* Mark the socket so it will listen for incoming connections */ 
     if (listen(listenSock, MAX_EVENTS) < 0)

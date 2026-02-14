@@ -6,7 +6,8 @@
 
 void DieWithError(char *errorMessage); /* Error handling function */ 
 
-void HandleTCPClient(int clntSocket) {
+void HandleTCPClient(int clntSocket) 
+{
     char echoBuffer[MESSAGE_SIZE];        /* Buffer for echo string */
     int recvMsgSize;                    /* Size of received message */
 
@@ -19,6 +20,7 @@ void HandleTCPClient(int clntSocket) {
     else if (recvMsgSize == 0) 
     {
         printf("Client disconnected (Socket %d)\n", clntSocket);
+        close(clntSocket);
     }   
     else 
     {
@@ -27,6 +29,4 @@ void HandleTCPClient(int clntSocket) {
             DieWithError("send() failed");
         }
     }
-
-    close(clntSocket);
 }

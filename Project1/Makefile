@@ -1,5 +1,5 @@
 CC = gcc
-CXXFLAGS = -Wall -g
+CXXFLAGS = -Wall -g -pthread
 
 PROJECTOBJECTS = pa1_skeleton.o DieWithError.o SetNonBlocking.o HandleTCPClient.o
 PROJECTSOURCES = pa1_skeleton.c DieWithError.c SetNonBlocking.c HandleTCPClient.c
