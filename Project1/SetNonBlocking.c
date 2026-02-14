@@ -1,5 +1,8 @@
 #include <unistd.h>
 #include <fcntl.h>  
+#include <stdio.h> /* for perror() */ 
+
+void DieWithError(char *errorMessage); /* Error handling function */ 
 
 int setnonblocking(int fd) 
 {

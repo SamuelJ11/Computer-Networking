@@ -4,6 +4,8 @@
 
 #define MESSAGE_SIZE 16
 
+void DieWithError(char *errorMessage); /* Error handling function */ 
+
 void HandleTCPClient(int clntSocket) {
     char echoBuffer[MESSAGE_SIZE];        /* Buffer for echo string */
     int recvMsgSize;                    /* Size of received message */

@@ -17,6 +17,12 @@ int server_port = 12345;
 int num_client_threads = DEFAULT_CLIENT_THREADS;
 int num_requests = 1000000;
 
+void DieWithError(char *errorMessage); /* Error handling function */ 
+
+void HandleTCPClient(int clntSocket); /* TCP client handling function */ 
+
+int setnonblocking(int fd); /* Function for setting non-blocking flags for file descriptors */
+
 /*
  * This structure is used to store per-thread data in the client
  */
