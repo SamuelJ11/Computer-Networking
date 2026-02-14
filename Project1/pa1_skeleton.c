@@ -28,11 +28,10 @@ typedef struct {
     float request_rate;  /* Computed request rate (requests per second) based on RTT and total messages. */
 } client_thread_data_t;
 
-void DieWithError(char *errorMessage) 
-{ 
-    perror(errorMessage); 
-    exit(1); 
-} 
+
+
+
+
 
 /*
  * This function runs in a separate client thread to handle communication with the server
@@ -195,16 +194,17 @@ void run_server() {
     int listenSock; /* Socket descriptor for server */ 
     int connSock; /* Socket descriptor for client */
 
-    struct epoll_event ev, events[MAX_EVENTS];
-
     /* Initialize the ev struct for the server*/
+    struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN;
-    ev.data.fd = listenSock;
 
     if ((listenSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
     {
-        DieWithError("socket () failed");
+        DieWithError("socket() failed");
     }
+
+    /* Set the file descriptor for the server to be the listening socket */
+    ev.data.fd = listenSock;
 
     /* Construct local address structure */ 
     memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
@@ -262,7 +262,7 @@ void run_server() {
                 }
 
                 setnonblocking(connSock);
-                ev.events = EPOLLIN | EPOLLET;
+                ev.events = EPOLLIN;
                 ev.data.fd = connSock;
 
                 /* Register the connection socket to epoll */
@@ -273,7 +273,7 @@ void run_server() {
             } 
             else 
             {
-                do_use_fd(events[n].data.fd);
+                HandleTCPClient(events[n].data.fd);
             }               
         }       
     }
