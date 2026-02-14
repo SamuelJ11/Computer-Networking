@@ -28,11 +28,6 @@ typedef struct {
     float request_rate;  /* Computed request rate (requests per second) based on RTT and total messages. */
 } client_thread_data_t;
 
-
-
-
-
-
 /*
  * This function runs in a separate client thread to handle communication with the server
  */
