@@ -1,24 +1,31 @@
 #include <unistd.h>
 #include <fcntl.h>  
-#include <stdio.h> /* for perror() */ 
+#include <stdio.h>
+#include <stdlib.h>
+
+static void DieWithError(char *errorMessage) 
+{ 
+    perror(errorMessage); 
+    exit(1); 
+} 
 
 int SetNonBlocking(int fd) 
 {
     int flags;
 
-    // Step 1: Get the current flags for the file descriptor
-    if ((flags = fcntl(fd, F_GETFL, 0)) == -1) {
-        perror("fcntl F_GETFL");
-        return -1;
+    /* Get the current flags for the file descriptor */
+    if ((flags = fcntl(fd, F_GETFL, 0)) == -1) 
+    {
+        DieWithError("fcntl F_GETFL");
     }
 
-    // Step 2: Use a "Bitwise OR" (|) to add the O_NONBLOCK flag to the existing flags
+    /* Use a "Bitwise OR" (|) to add the O_NONBLOCK flag to the existing flags */
     flags |= O_NONBLOCK;
 
-    // Step 3: Set the updated flags back to the file descriptor
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        perror("fcntl F_SETFL");
-        return -1;
+    /* Set the updated flags back to the file descriptor */
+    if (fcntl(fd, F_SETFL, flags) == -1) 
+    {
+        DieWithError("fcntl F_GETFL");
     }
 
     return 0;
