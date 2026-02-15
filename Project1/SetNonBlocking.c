@@ -2,7 +2,7 @@
 #include <fcntl.h>  
 #include <stdio.h> /* for perror() */ 
 
-int setnonblocking(int fd) 
+int SetNonBlocking(int fd) 
 {
     int flags;
 

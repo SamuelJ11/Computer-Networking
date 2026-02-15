@@ -21,7 +21,7 @@ void DieWithError(char *errorMessage); /* Error handling function */
 
 void HandleTCPClient(int clntSocket); /* TCP client handling function */ 
 
-int setnonblocking(int fd); /* Function for setting non-blocking flags for file descriptors */
+int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
 
 /*
  * This structure is used to store per-thread data in the client
@@ -81,7 +81,7 @@ void *client_thread_func(void *arg) {
         /* Use epoll_wait() to wait for a response from the server */
         if (epoll_wait(data->epoll_fd, events, MAX_EVENTS, -1) < 0)
         {
-            DieWithError("epoll_wait failed");
+            DieWithError("epoll_wait() failed");
         }
 
          /* TODO:
@@ -109,7 +109,8 @@ void *client_thread_func(void *arg) {
  * This function orchestrates multiple client threads to send requests to a server,
  * collect performance data of each threads, and compute aggregated metrics of all threads.
  */
-void run_client() {
+void run_client() 
+{
     pthread_t threads[num_client_threads];
     client_thread_data_t thread_data[num_client_threads];
     struct sockaddr_in server_addr;
@@ -145,7 +146,7 @@ void run_client() {
         thread_data[i].epoll_fd = epoll_create(10);
         if (thread_data[i].epoll_fd == -1) 
         {
-            DieWithError("failed to created the epoll instance for client");
+            DieWithError("failed to create the epoll instance for client");
         }   
     }
     
@@ -179,7 +180,8 @@ void run_client() {
     printf("Total Request Rate: %f messages/s\n", total_request_rate);
 }
 
-void run_server() {
+void run_server() 
+{
 
     /* TODO:
      * Server creates listening socket and epoll instance.
@@ -214,9 +216,11 @@ void run_server() {
     ServAddr.sin_port = htons(server_port); /* Server port */     
 
     /* Bind to the local address */ 
-    if (bind(listenSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0) 
-        DieWithError ("bind() failed"); 
-
+    if (bind(listenSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
+    {
+        DieWithError ("bind() failed");
+    } 
+         
     /* Mark the socket so it will listen for incoming connections */ 
     if (listen(listenSock, MAX_EVENTS) < 0)
     {
@@ -262,7 +266,7 @@ void run_server() {
                     DieWithError("accept() failed"); 
                 }
 
-                setnonblocking(connSock);
+                SetNonBlocking(connSock);
                 ev.events = EPOLLIN;
                 ev.data.fd = connSock;
 
@@ -272,7 +276,7 @@ void run_server() {
                     DieWithError("failed to register server's connection socket to the interest list");
                 }
             } 
-            else 
+            else /* Handle existing connections to clients */
             {
                 HandleTCPClient(events[n].data.fd);
             }               
@@ -280,20 +284,26 @@ void run_server() {
     }
 }
 
-int main(int argc, char *argv[]) {
-    if (argc > 1 && strcmp(argv[1], "server") == 0) {
+int main(int argc, char *argv[]) 
+{
+    if (argc > 1 && strcmp(argv[1], "server") == 0) 
+    {
         if (argc > 2) server_ip = argv[2];
         if (argc > 3) server_port = atoi(argv[3]);
 
         run_server();
-    } else if (argc > 1 && strcmp(argv[1], "client") == 0) {
+    } 
+    else if (argc > 1 && strcmp(argv[1], "client") == 0) 
+    {
         if (argc > 2) server_ip = argv[2];
         if (argc > 3) server_port = atoi(argv[3]);
         if (argc > 4) num_client_threads = atoi(argv[4]);
         if (argc > 5) num_requests = atoi(argv[5]);
 
         run_client();
-    } else {
+    } 
+    else 
+    {
         printf("Usage: %s <server|client> [server_ip server_port num_client_threads num_requests]\n", argv[0]);
     }
 
