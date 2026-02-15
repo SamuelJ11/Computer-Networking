@@ -25,7 +25,7 @@ int SetNonBlocking(int fd)
     /* Set the updated flags back to the file descriptor */
     if (fcntl(fd, F_SETFL, flags) == -1) 
     {
-        DieWithError("fcntl F_GETFL");
+        DieWithError("fcntl F_SETFL");
     }
 
     return 0;
