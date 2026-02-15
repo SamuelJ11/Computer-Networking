@@ -24,12 +24,9 @@ static void DieWithError(char *errorMessage)
 }  
 
 void HandleTCPClient(int clntSocket); /* TCP client handling function */ 
-
 int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
 
-/*
- * This structure is used to store per-thread data in the client
- */
+/* This structure is used to store per-thread data in the client */
 typedef struct {
     int epoll_fd;        /* File descriptor for the epoll instance, used for monitoring events on the socket. */
     int client_fd;       /* File descriptor for the client socket connected to the server. */
@@ -62,8 +59,7 @@ void *client_thread_func(void *arg)
     }
 
     /* Client thread sends messages to the server, waits for a response using epoll, 
-       and measures the round-trip time (RTT) of this request-response.
-    */
+       and measures the round-trip time (RTT) of this request-response */
     for (int i = 0; i < num_requests; i++) 
     {
         /* Use gettimeofday() to "start the timer" for the client's sent messsage */
@@ -98,10 +94,8 @@ void *client_thread_func(void *arg)
     return NULL;
 }
 
-/*
- * This function orchestrates multiple client threads to send requests to a server,
- * collect performance data of each threads, and compute aggregated metrics of all threads.
-*/
+/* This function orchestrates multiple client threads to send requests to a server,
+   collect performance data of each threads, and compute aggregated metrics of all threads */
 void run_client() 
 {
     pthread_t threads[num_client_threads];
@@ -154,8 +148,7 @@ void run_client()
         total_messages += thread_data[i].total_messages;
     }
     
-    total_request_rate = ((double)total_messages * 1000000.0) / total_rtt;
-    
+    total_request_rate = ((double)total_messages * 1000000.0) / total_rtt;    
     printf("Average RTT: %.2f µs\n", total_rtt / (double)total_messages);
     printf("Total Request Rate: %.2f messages/s\n", total_request_rate);
 }
@@ -241,8 +234,7 @@ void run_server()
                 }
 
                 /* Set connection socket to non-blocking to allow the server to handle multiple 
-                concurrent threads without waiting for any one client to finish communicating.
-                */
+                concurrent threads without waiting for any one client to finish communicating */                
                 SetNonBlocking(connSock);
                 ev.events = EPOLLIN;
                 ev.data.fd = connSock;

@@ -31,7 +31,6 @@ void HandleTCPClient(int clntSocket)
     } 
     else if (errno != EAGAIN) 
     {
-        
         DieWithError("recv() failed"); /* A fatal error occurred, not just a "try again later" notification */ 
     }
 }
