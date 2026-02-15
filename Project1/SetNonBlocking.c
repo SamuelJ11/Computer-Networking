@@ -9,24 +9,22 @@ static void DieWithError(char *errorMessage)
     exit(1); 
 } 
 
-int SetNonBlocking(int fd) 
+void SetNonBlocking(int fd) 
 {
     int flags;
 
     /* Get the current flags for the file descriptor */
-    if ((flags = fcntl(fd, F_GETFL, 0)) == -1) 
+    if ((flags = fcntl(fd, F_GETFL, 0)) < 0) 
     {
-        DieWithError("fcntl F_GETFL");
+        DieWithError("failed to fetch flags for descriptor");
     }
 
     /* Use a "Bitwise OR" (|) to add the O_NONBLOCK flag to the existing flags */
     flags |= O_NONBLOCK;
 
     /* Set the updated flags back to the file descriptor */
-    if (fcntl(fd, F_SETFL, flags) == -1) 
+    if (fcntl(fd, F_SETFL, flags) < 0) 
     {
-        DieWithError("fcntl F_SETFL");
+        DieWithError("failed to set flags for descriptor");
     }
-
-    return 0;
 }

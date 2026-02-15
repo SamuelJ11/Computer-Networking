@@ -54,7 +54,7 @@ void *client_thread_func(void *arg)
     int total_messages = 0;
 
     /* Register the connected socket from the interest list using epoll_ctl() */
-    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) == -1) 
+    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
     {
         DieWithError("failed to register client's connection socket to the interest list");
     }
@@ -202,13 +202,13 @@ void run_server()
          
     /* Create the epoll instance for the server */
     int server_fd = epoll_create(1);
-    if (server_fd == -1) 
+    if (server_fd < 0) 
     {
         DieWithError("failed to the created the epoll instance for server");
     }   
 
     /* Register the listening socket to epoll */
-    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, listenSock, &ev) == -1) 
+    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, listenSock, &ev) < 0) 
     {
         DieWithError("failed to register server's listening socket to the interest list");
     }
@@ -230,7 +230,7 @@ void run_server()
             if (events[n].data.fd == listenSock) 
             {
                 /* Accept all waiting clients in one go */
-                while ((connSock = accept(listenSock, (struct sockaddr *) &ClntAddr, &clntLen)) >= 0) 
+                while ((connSock = accept(listenSock, (struct sockaddr *)&ClntAddr, &clntLen)) >= 0) 
                 {
                     SetNonBlocking(connSock);
                     ev.data.fd = connSock;
@@ -240,7 +240,6 @@ void run_server()
                         DieWithError("failed to register connection socket");
                     }
                 }
-
                 /* After the loop, check if we stopped because the queue is empty */
                 if (connSock < 0 && errno != EAGAIN) 
                 {
