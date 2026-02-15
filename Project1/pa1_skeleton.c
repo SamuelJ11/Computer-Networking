@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <errno.h>
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
@@ -148,7 +149,8 @@ void run_client()
         total_messages += thread_data[i].total_messages;
     }
     
-    total_request_rate = ((double)total_messages * 1000000.0) / total_rtt;    
+    total_request_rate = ((double)total_messages * 1000000.0) / total_rtt;
+       
     printf("Average RTT: %.2f µs\n", total_rtt / (double)total_messages);
     printf("Total Request Rate: %.2f messages/s\n", total_request_rate);
 }
@@ -227,22 +229,22 @@ void run_server()
             /* Check if the incoming message is a connection request from a new client */
             if (events[n].data.fd == listenSock) 
             {
-                /* Wait for a client to connect */     
-                if ((connSock = accept(listenSock, (struct sockaddr *) &ClntAddr, &clntLen)) < 0)
+                /* Accept all waiting clients in one go */
+                while ((connSock = accept(listenSock, (struct sockaddr *) &ClntAddr, &clntLen)) >= 0) 
                 {
-                    DieWithError("accept() failed"); 
+                    SetNonBlocking(connSock);
+                    ev.data.fd = connSock;
+
+                    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, connSock, &ev) < 0) 
+                    {
+                        DieWithError("failed to register connection socket");
+                    }
                 }
 
-                /* Set connection socket to non-blocking to allow the server to handle multiple 
-                concurrent threads without waiting for any one client to finish communicating */                
-                SetNonBlocking(connSock);
-                ev.events = EPOLLIN;
-                ev.data.fd = connSock;
-
-                /* Register the connection socket to epoll */
-                if (epoll_ctl(server_fd, EPOLL_CTL_ADD, connSock, &ev) == -1) 
+                /* After the loop, check if we stopped because the queue is empty */
+                if (connSock < 0 && errno != EAGAIN) 
                 {
-                    DieWithError("failed to register server's connection socket to the interest list");
+                    DieWithError("accept() failed unexpectedly");
                 }
             } 
             else /* Handle existing connections to clients */
