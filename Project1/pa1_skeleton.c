@@ -145,9 +145,9 @@ void run_client()
         double thread_request_rate = ((double)thread_messages * 1000000.0) / thread_rtt;
         
         printf("Results For Thread %d: ", i + 1);
-        printf("Finished processing %d requests \n\n", thread_messages);
+        printf("Finished Processing %d Requests \n\n", thread_messages);
         printf("Average Thread RTT: %.2f µs\n", thread_rtt / (double)thread_messages);
-        printf("Thread Request Rate: %.2f messages/s\n", thread_request_rate);
+        printf("Thread Request Rate: %.2f Messages/s\n", thread_request_rate);
         puts("==============================================================");
 
         total_rtt += thread_rtt;
@@ -159,9 +159,9 @@ void run_client()
     double average_rtt = total_rtt / (double)total_messages;
 
     puts("==============================================================");
-    printf("Summary Statistics: Finished Processing %d total requests \n\n", total_messages);
-    printf("Average RTT For All Threads): %.2f µs\n", average_rtt);
-    printf("Average Request Rate For All Threads: %.2f messages/s\n", average_request_rate);
+    printf("Summary Statistics: Finished Processing %d Total Requests \n\n", total_messages);
+    printf("Average RTT For All Threads: %.2f µs\n", average_rtt);
+    printf("Average Request Rate For All Threads: %.2f Messages/s\n", average_request_rate);
     puts("==============================================================");
 }
 
