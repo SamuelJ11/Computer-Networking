@@ -19,8 +19,7 @@ void SetNonBlocking(int fd)
         DieWithError("failed to fetch flags for descriptor");
     }
 
-    /* Use a "Bitwise OR" (|) to add the O_NONBLOCK flag to the existing flags */
-    flags |= O_NONBLOCK;
+    flags |= O_NONBLOCK;  /* Use a "Bitwise OR" (|) to add the O_NONBLOCK flag to the existing flags */
 
     /* Set the updated flags back to the file descriptor */
     if (fcntl(fd, F_SETFL, flags) < 0) 
