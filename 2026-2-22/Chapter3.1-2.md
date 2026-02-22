@@ -74,4 +74,60 @@
 
 # 3.3: Connectionless Transport: UDP
 
+    • DNS is an example of an application-layer protocol that typically uses UDP:
+
+        - the DNS client creates a query message, UDP adds a header, and network sends it to a DNS server
+
+        - the client waits for a reply from the server, but because UDP is unreliable, the DNS application may retry the query, try another DNS server, or report failure if no response arrives
+
+    • Although commonly done today, running multimedia applications over UDP needs to be done with care. As we mentioned above, UDP has no congestion control:
+    
+        - congestion control is needed to prevent the network from entering a congested state in which very little useful work is done
+
+    • It is possible for an application to have reliable data transfer when using UDP. This can be done if reliability is built into the application itself 
+
+## 3.3.2: UDP Checksum
+
+    • The UDP checksum provides for error detection; that is, the checksum is used to determine whether bits within the UDP segment have been altered
+
+    • UDP at the sender side performs the 1's complement of the sum of all the 16-bit words in the segment, with any overflow encountered during the sum being wrapped around; this result is put in the checksum field of the UDP segment.
+    
+    • As an example, suppose that we have the following three 16-bit words:
+
+        0110011001100000
+        0101010101010101
+        1000111100001100
+
+        the sum of the first two of these 16-bit words is:
+
+        1011101110110101
+
+        Adding the third word to the above gives:
+
+        0100101011000010
+
+        * note that this last addition had overflow, which was wrapped around
+
+        now the 1's complement is obtained of the sum:
+
+        1011010100111101
+
+        this is the checksum
+
+    • At the reciever, all four 16-bit words are added, including the checksum; if no errors are introduced into the packet, the sum at the reciever will be 1111111111111111
+
+        - if one of the  bits is a zero, then we know that errors have ben introeduced into the packet
+
+    • Why does UDP bother with error-checking?
+    
+        (1) not all network links guarantee error checking, and errors can occur inside routers
+
+        (2) link-layer checks only protect one hop, not the entire path
+
+        (3) UDP includes a checksum so the receiver can verify data after the full end-to-end journey
+
+    • The above process follows the end-to-end principle: important reliability functions should be implemented at the endpoints
+
+
+
 
