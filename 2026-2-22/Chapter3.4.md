@@ -104,5 +104,53 @@
 
 ## 3.4.2: Pipelined Reliable Data Transfer Protocols
 
+    • For the stop and wait protocol, the sender had a utilization (the fraction of time the sender is actually busy sending bits into the channel) of only 0.00027
 
+        - That is, the sender was busy only 2.7 hundredths of one percent of the time! 
+
+    • The solution to this particular performance problem is simple: Rather than operate in a stop-and-wait manner, the sender is allowed to send multiple packets without waiting for acknowledgments.
+
+        - this is known as pipelining
+
+    • Pipelining has several important consequences:
+
+        (1) the range of sequence numbers must be increased, since each in-transit packet (not counting retransmissions) must have a unique sequence number and there may be multiple, in-transit, unacknowledged packets
+
+        (2) the sender and receiver sides of the protocols may have to buffer more than one packet. Minimally, the sender will have to buffer packets that have been transmitted but not yet acknowledged. Buffering of correctly received packets may also be needed at the receiver
+
+        (3) the range of sequence numbers needed and the buffering requirements will depend on the manner in which a data transfer protocol responds to lost, corrupted, and overly delayed packets. Two basic approaches toward pipelined error recovery can be identified: Go-Back-N and selective repeat
+
+## 3.4.3: Go-Back-N (GBN)
+
+    • In a Go-Back-N (GBN) protocol, the sender is allowed to transmit multiple packets (when available) without waiting for an acknowledgment, but is constrained to have no more than some maximum allowable number 'N' of unacknowledged packets in the pipeline.
+
+    • Instead of just "0" and "1", we now have a long line of sequence numbers.
     
+        (1) the Window: this is the bracketed section in the diagram of size 'N'. It represents the maximum number of packets the sender is allowed to have "in flight" (sent but not yet acknowledged).  As soon as the sender receives an ACK for the oldest packet in the window (base), the window "slides" forward to the right, allowing the sender to transmit a brand-new packet
+
+        (2) The Limits of Sequence Numbers: the range of sequence numbers for packets that have been sent but aren't yet acknowledged is restricted to this window size.  This provides flow control and congestion control
+
+    • If 'k' is the number of bits in the packet sequence number field (in the packet header), then the range of sequence numbers is this [0, 2ᵏ - 1]
+    
+        -With a finite range of sequence numbers, all arithmetic involving sequence numbers must then be done using (mod 2ᵏ) arithmetic
+
+    • In our GBN protocol, an acknowledgment for a packet with sequence number 'n' will be taken to be a cumulative acknowledgment, indicating that all packets with a sequence number up to and including 'n' have been correctly received at the receiver. 
+
+    • As in the stop-and-wait protocol, a timer will again be used to recover from lost data or acknowledgment packets. If a timeout occurs, the sender resends ALL packets that have been previously sent but that have not yet been acknowledged
+
+        - this timer is a timer for the oldest transmitted but not yet acknowledged packet
+
+        - if an ACK is received but there are still additional transmitted but not yet acknowledged packets, the timer is restarted
+
+        - if there are no outstanding, unacknowledged packets, the timer is stopped
+
+    • In our GBN protocol, the receiver discards a packet that has been received correctly but has a sequence number that is larger than 'expectedseqnum'. For example, if the GBN receiver is waiting for a packet with sequence number 'n', and a packet with sequence number 'n + 1' arrives, that packet is discarded by the GBN receiver even though the data in the arriving packet will eventually need to be delivered to the upper layer at the receiver. 
+
+    • The most important takeaway is that GBN is the "skeleton" for TCP, and by learning GBN we are learning the four pillars of reliable data transfer:
+
+        (1) sequence numbers: keeps packets in the right order
+        (2) cumulative ACKs: one ACK can confirm multiple packets at once
+        (3) checksums: detects if bits were flipped or corrupted during transit
+        (4) timeout/retransmit: fixes the problem of lost packets by resending
+
+## 3.4.4: Selective Repeat (SR)
