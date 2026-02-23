@@ -154,3 +154,30 @@
         (4) timeout/retransmit: fixes the problem of lost packets by resending
 
 ## 3.4.4: Selective Repeat (SR)
+
+    • There are scenarios in which GBN itself suffers from performance problems; in particular, when the window size and bandwidth-delay product are both large, many packets can be in the pipeline. 
+    
+        - a single packet error can thus cause GBN to retransmit a large number of packets, many unnecessarily if they have been correctly received but are out-of-order and thus buffered at the receiver
+
+    • As the name suggests, selective-repeat protocols avoid unnecessary retransmissions by having the sender retransmit only those packets that were received in error (that is, were lost or corrupted) at the receiver.
+
+    • In GBN, the receiver is incredibly simple: it only tracks a single number, the expected sequence number.
+
+        - it does not buffer anything. If it gets packet 5 but was expecting packet 4, it throws 5 away
+
+    • In SR, the receiver is much more advanced. It has its own window of size 'N'
+
+        - it is allowed to accept and buffer packets that arrive out of order (hence the receiver now has its own "sliding window" just like the sender)
+
+    • In figure 3.23, the receiver's rcv_base is further ahead than the sender's send_base because:
+
+        (1) the receiver got a packet and moved its base forward
+        (2) the reciever sent an ACK back
+        (3) crucially, the ACK that was previously sent hasn't arrived at the sender yet
+        (4) because of (3), the sender's send_base is "stuck" in th past until that signal arrives
+
+    • It is important to note that in Step 2 in Figure 3.25, the receiver reacknowledges (rather than ignores) already received packets with certain sequence numbers below the current window base; the necessity of this can be illustrated by the fact that of the receiver were not to acknowledge this packet, the sender’s window would never move forward!
+
+    • When data travels over a network rather than a single wire, packets can be reordered or "buffered" by the network and delivered much later than expected. 
+    
+        - to prevent these old, delayed packets from being mistaken for new data when sequence numbers are eventually reused, the system ensures a sequence number is not recycled until a "maximum packet lifetime" (often three minutes) has passed
