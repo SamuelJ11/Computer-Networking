@@ -1,0 +1,86 @@
+# 3.4: Introduction and Transport-Layer Services
+
+## 3.4.1: Building a Reliable Data Transfer Protocol
+
+### Reliable Data Transfer over a Perfectly Reliable Channel: rdt 1.0
+
+    • We now step through a series of protocols, each one becoming more complex, arriving at a flawless, reliable data transfer protocol.
+
+        - there are seperate FSMs for the sender and reciever; in this model each only have one state
+
+        - when no action is taken, a symbol looking like an upside down capital 'V' is shows above or below the horizontal
+
+        - initial states are indicated by dashed arrows
+
+    • The sending side of rdt simply accepts data from the upper layer via the rdt_send(data) event, creates a packet containing the data (via the action make_pkt(data)) and sends the packet into the channel. 
+
+    • On the receiving side, rdt receives a packet from the underlying channel via the rdt_rcv(packet) event, removes the data from the packet (via the action extract(packet, data)) and passes the data up to the upper layer (via the action deliver_data(data)).
+    
+    • In this simple model all packet flow is from the sender to receiver; with a perfectly reliable channel there is no need for the receiver side to provide any feedback to the sender since nothing can go wrong! 
+
+### Reliable Data Transfer over a Channel with Bit Errors: rdt 2.0
+
+    • A more realistic model of the underlying channel is one in which bits in a packet may be corrupted. Such bit errors typically occur in the physical components of a network as a packet is transmitted, propagates, or is buffered
+
+    • Control messages like ACK and NAK allow the receiver to let the sender know what has been received correctly, and has been recieved in error and thus requires repeating
+
+        - In a computer network setting, reliable data transfer protocols based on such retransmission are known as ARQ (Automatic Repeat reQuest) protocols
+
+    • Fundamentally, three additional protocol capabilities are required in ARQ protocols to handle the presence of bit errors:
+
+        (1) Error detection     (checksum)
+        (2) Receiver feedback   (ACK and NAK)
+        (3) Retransmission      
+
+    • The send side of rdt2.0 has two states:
+
+        - in the leftmost state, the send-side protocol is waiting for data to be passed down fro the upper layer, then when the rdt_send(data) event occurs, the sender will create a packet (sndpck) containing the data to be sent along with the checksum, then send the packet via udt_send(sndpkt)
+
+        - in the rightmost state, the sender protocol is waiting for an ACK or a NAK packet from the receiver.  
+        
+            (1) if an ACK packetg is recieved, the sender knows that the most recently transmitted packet has been recieved correctly and thus the protocol returns to the state of waiting for data from the upper layer
+
+            (2) if a NAK is recieved, the protocol retransmits the last packet and wiats for an ACK or NAK to be returned by the reciever in response to the retransmitted data packet
+
+    • It is important to note that when the sender is in the wait-for-ACK-or-NAK state, it cannot get more data from the upper layer; that is, the rdt_send() event can not occur; that will happen only after the sender receives an ACK and leaves this state. Thus, the sender will not send a new piece of data until it is sure that the receiver has correctly received the current packet. Because of this behavior, protocols such as rdt2.0 are known as stop-and-wait protocols.
+
+    • The receiver side FSM for rdt2.0 still has a single state, just replying with either NAK or ACK depending on whether or not the received packet is corrupted.
+
+    • The rdt 2.0 protocol fails to account for the possibility that the ACK or NAK packet could be corrupted!
+
+        - the difficulty here is that if an ACK or NAK is corrupted, the sender has no way of knowing whether or not the receiver has correctly received the last piece of transmitted data
+
+    • A simple solution to this new problem (and one adopted in almost all existing data transfer protocols, including TCP) is to add a new field to the data packet and have the sender number its data packets by putting a sequence number into this field.
+
+        - the receiver then need only check this sequence number to determine whether or not the received packet is a retransmission
+
+    • In a stop-and-wait protocol, only two numbers are needed for the sequence number: 0 and 1 (or “mod 2” numbering).
+
+        - every time the sender sends a packt, the sequence number is incremented by 1 (mod 2)
+
+        - if the first packet sent has a sequence number of 0, the receiver accepts it, delivers the data, and remembers that the last received sequence number is 0
+
+        - the sender then waits for an acknowledgement before sending the next packet
+
+        - if the ACK for packet 0 is lost, the sender retransmits packet 0
+
+        - when the reciever sees packet 0 again, it notices the sequence number matches the last recieved number, meaning its a duplicate transmission, so it discards the data and resends an ACK
+
+        - once the reciever sees a packet with sequence number 1, it knows this is new data, delivers it, updates the last recieved sequence number to 1, and sends and ACK for 1
+
+        - the sender then increments the sequence number (mod 2) again, ready to send the next packet (0) and the process repeats
+
+    • Our fixed version of rdt 2.1 sender and reciever FSMs each now have twice as many states as before; this is because the protocol state must now reflect whether the packet currently being sent (by the sender) or expected (at the receiver) should have a sequence number of 0 or 1
+
+    • Our NAK-free reliable data transfer protocol for a channel with bit errors is rdt 2.2:
+
+        - One subtle change between rdt 2.1 and rdt 2.2 is that the receiver must now include the sequence number of the packet being acknowledged by an ACK message (this is done by including the 0 or 1 argument in make_pkt() in the receiver FSM), and the sender must now check the sequence number of the packet being acknowledged by a received ACK message (this is done by including the 0 or 1 argument in isACK() in the sender FSM).
+
+    • To clarify the last point, instead of sending a NAK, the receiver now just sends an ACK for the last correctly received packet:
+    
+        - if the sender gets duplicate ACKs for the same sequence number, it knows the next packet was lost or corrupted.
+
+    • This approach avoids the need to have two types of ACK messages.
+
+### Reliable Data Transfer over a Lossy Channel with Bit Errors: rdt 3.0
+    
