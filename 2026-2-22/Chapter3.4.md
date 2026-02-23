@@ -83,4 +83,26 @@
     • This approach avoids the need to have two types of ACK messages.
 
 ### Reliable Data Transfer over a Lossy Channel with Bit Errors: rdt 3.0
+
+    • Suppose now that in addition to corrupting bits, the underlying channel can lose packets as well, a not-uncommon event in today’s computer networks (including the Internet):
+
+        - two additional concerns must now be addressed by the protocol: how to detect packet loss and what to do when packet loss occurs
+
+    • Suppose that the sender transmits a data packet and either that packet, or the receiver’s ACK of that packet, gets lost. In either case, no reply is forthcoming at the sender from the receiver.
+    
+        - if the sender is willing to wait long enough so that it is certain that a packet has been lost, it can simply retransmit the data packet . . . but how long should the sender wait?
+
+    • The approach thus adopted in practice is for the sender to judiciously choose a time value such that packet loss is likely, although not guaranteed, to have happened. 
+
+        - if an ACK is not received within this time, the packet is retransmitted. 
+        
+        - if a packet experiences a particularly large delay, the sender may retransmit the packet even though neither the data packet nor its ACK have been lost, introducing the possibility of duplicate data packets in the sender-to-receiver channel
+
+    • Implementing a time-based retransmission mechanism requires a countdown timer that can interrupt the sender after a given amount of time has expired.
+
+    • Because packet sequence numbers alternate between  and , protocol  is sometimes known as the alternating-bit protocol.
+
+## 3.4.2: Pipelined Reliable Data Transfer Protocols
+
+
     
