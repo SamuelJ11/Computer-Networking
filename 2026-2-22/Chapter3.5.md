@@ -251,3 +251,33 @@
         - if the receiver's application is too slow to pull data out of the buffer, the buffer simply overflows and the extra data is permanently deleted
 
 ## 3.5.6: TCP Connection Management
+
+    • Suppose a process running in one host (client) wants to initiate a connection with another process in another host (server):
+
+        (1) the client-side TCP first sends a special TCP segment with the one of the flag bits (SYN bit) set to 1; this is SYN segment
+
+            - the segment is encapsulated within an IP datagram and sent to the server with an initial sequence number 'client_isn'
+
+        (2) the server extracts the TCP SYN segment from the datagram, allocates the TCP buffers and variables to the connection, and sends a connection-granted segment to the client TCP
+
+            - in this "connection granted" segment, the SYN bit is also set to 1, the acknowledgement field of the TCP segment header is set to client_isn + 1, and the server chooses its own sequence number 'server_isn" and puts this value in the sequence number field of the TCP segment header
+
+            - this is formally referred to as the SYNACK segment
+
+        (3) upon recieving the SYNACK segment, the client allocates buffers and variables to the connection
+
+            - the client host acknowledges the server’s connection-granted segment by putting the value 'server_isn + 1' in the acknowledgment field of the TCP segment header, and the SYN bit is set to 0
+
+    • Since 3 packets were sent between the two hosts to establish a connection, this processes is referred to as the "three-way handshake"
+
+    • If the client and server have previously communicated, it’s possible to use a technique known as “fast open” to reduce the handshaking time to zero! 
+
+    • The key idea behind fast open, also sometimes referred to as 0-RTT handshaking, is that during a traditional three-way handshake, a client can also request that the server provide it with a fast-open cookie, which encodes all of the connection information needed in a future connection.
+
+        - the next time the client wants to establish a connection with this server, it sends the fast-open cookie together with application-layer data in its very first message to the server
+
+    • When the client application process issues a close command, the client TCP sends a special TCP segment with the 'FIN' flag bit set to 1.
+
+        - when the server receives this segment, it sends the client an acknowledgment segment in return. The server then sends its own shutdown segment, which has the FIN bit set to .
+
+    • During the life of a TCP connection, the TCP protocol running in each host makes transitions through various TCP states (see figures 3.39 and 3.40)
