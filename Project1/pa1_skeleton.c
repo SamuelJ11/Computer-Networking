@@ -50,7 +50,6 @@ void *client_thread_func(void *arg)
     ev.data.fd = data->client_fd;
     
     long long RTT = 0;
-    int total_messages = 0;
 
     /* Register the connected socket from the interest list using epoll_ctl() */
     if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
@@ -169,7 +168,6 @@ void run_server()
 {
     struct sockaddr_in ServAddr; /* Local address of server */ 
     struct sockaddr_in ClntAddr; /* Client address */
-    unsigned short echoServPort; /* Server port */     
     unsigned int clntLen; /* Length of client address data structure */
 
     /* Create socket for incoming connections */ 
