@@ -61,7 +61,7 @@ void *client_thread_func(void *arg)
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
     packetdata.alpha = 0.125;
     packetdata.beta = 0.25;
-    packetdata.EstimatedRTT = 100;
+    packetdata.EstimatedRTT = 10000;
     packetdata.TimeoutInterval = 1000000;
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
@@ -188,10 +188,19 @@ void run_server()
 
     /* Create socket for incoming connections */ 
     int UDPSock; 
+
+    /* Initialize the event struct for the server*/
+    struct epoll_event ev, events[MAX_EVENTS];
+    ev.events = EPOLLIN; /* The server is listening for read operation */
+
+
     if ((UDPSock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
     {
         DieWithError("socket() failed");
     }
+
+    /* Set the file descriptor for the server to be the generic UDP socket */
+    ev.data.fd = UDPSock;
     
     /* Construct local address structure */ 
     memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
@@ -207,25 +216,44 @@ void run_server()
 
     /* Set UDP socket to non-blocking to ensure recvfrom() returns immediately if no 
     data is ready, rather than freezing the thread */
-    SetNonBlocking(UDPSock);    
+    SetNonBlocking(UDPSock);
+    
+    /* Create the epoll instance for the server */
+    int server_fd = epoll_create(1);
+    if (server_fd < 0) 
+    {
+        DieWithError("failed to the created the epoll instance for server");
+    } 
+    /* Register the listening socket to epoll */
+    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
+    {
+        DieWithError("failed to register server's listening socket to the interest list");
+    }          
 
     /* Server's run-to-completion event loop */
     while (1) 
     {
-        clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */         
-        recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen);
-    
+        clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
+        
+        if (epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0)
+        {
+            DieWithError("epoll_wait() failed");
+        }
+
+        while ((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+        {
+            sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+
+            if (sentMsgSize != recvMsgSize) 
+            {
+                DieWithError("sendto() sent a different number of bytes than expected");
+            }
+        }
+
         if (recvMsgSize < 0 && errno != EAGAIN)
         {
             DieWithError("recvfrom() failed or connection closed prematurely");
-        }
-        
-        sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
-
-        if (sentMsgSize != recvMsgSize)
-        {
-            DieWithError("sendto() sent a different number of bytes than expected");
-        }                     
+        }                
     }
 }
 
