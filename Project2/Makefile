@@ -1,10 +1,10 @@
 CC = gcc
 CXXFLAGS = -Wall -g -pthread
 
-PROJECTOBJECTS = pa1_skeleton.o SetNonBlocking.o 
-PROJECTSOURCES = pa1_skeleton.c SetNonBlocking.c
+PROJECTOBJECTS = pa2_skeleton.o SetNonBlocking.o 
+PROJECTSOURCES = pa2_skeleton.c SetNonBlocking.c
 
-EXEC = pa1_skeleton
+EXEC = pa2_skeleton
 
 $(EXEC): $(PROJECTOBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@
