@@ -12,11 +12,12 @@
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
+#define NUM_REQUESTS 10000
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
 int num_client_threads = DEFAULT_CLIENT_THREADS;
-int num_requests = 100000;
+int num_requests = NUM_REQUESTS;
 
 static void DieWithError(char *errorMessage) 
 { 
