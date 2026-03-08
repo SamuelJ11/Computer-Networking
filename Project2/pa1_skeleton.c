@@ -177,6 +177,7 @@ void run_server()
     struct sockaddr_in ClntAddr; /* Client address */     
     unsigned int clntLen; /* Length of client address data structure */
     char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
+    int recvMsgSize; /* Size of received message */ 
 
     /* Create socket for incoming connections */ 
     int UDPSock; /* Socket descriptor for server */ 
@@ -223,20 +224,20 @@ void run_server()
     while (1) 
     {
         clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
-        int nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1); /* number of ready fds in our epoll interest list*/
-
-        if (nfds < 0)
+        int nfds;  /* number of ready fds in our epoll interest list*/
+    
+        if (nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0)
         {
             DieWithError("epoll_wait() error");
         }
 
         for (int n = 0; n < nfds; ++n) 
         {   
-            if (recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(FromAddr) != MESSAGE_SIZE))
+            if (recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(FromAddr) != MESSAGE_SIZE))
             {
                 DieWithError("recvfrom() failed or connection closed prematurely");
             } 
-            if (sendto(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr) != MESSAGE_SIZE))
+            if (sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr) != recvMsgSize))
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }                  
