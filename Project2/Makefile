@@ -1,5 +1,5 @@
 CC = gcc
-CXXFLAGS = -Wall -g -pthread
+CFLAGS = -Wall -g -pthread
 
 PROJECTOBJECTS = pa2_skeleton.o SetNonBlocking.o 
 PROJECTSOURCES = pa2_skeleton.c SetNonBlocking.c

@@ -31,7 +31,7 @@ int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file 
 typedef struct {
     int epoll_fd;        /* File descriptor for the epoll instance, used for monitoring events on the socket. */
     int client_fd;       /* File descriptor for the client socket connected to the server. */
-    long long total_rtt; /* Accumulated Round-Trip Time (RTT) for all messages sent and received (in microseconds). */
+    long total_rtt; /* Accumulated Round-Trip Time (RTT) for all messages sent and received (in microseconds). */
     long total_messages; /* Total number of messages sent and received. */
     float request_rate;  /* Computed request rate (requests per second) based on RTT and total messages. */
 } client_thread_data_t;
@@ -40,6 +40,13 @@ typedef struct {
 void *client_thread_func(void *arg) 
 {
     client_thread_data_t *data = (client_thread_data_t *)arg;
+
+    /* Zero out accumulation metrics */
+    data->total_rtt = 0;
+    data->total_messages = 0;
+    data->request_rate = 0.0f;
+
+    /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
     char recv_buf[MESSAGE_SIZE];
@@ -49,8 +56,6 @@ void *client_thread_func(void *arg)
     ev.events = EPOLLIN;
     ev.data.fd = data->client_fd;
     
-    long long RTT = 0;
-
     /* Register the connected socket from the interest list using epoll_ctl() */
     if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
     {
@@ -58,7 +63,7 @@ void *client_thread_func(void *arg)
     }
 
     /* Client thread sends messages to the server, waits for a response using epoll, 
-       and measures the round-trip time (RTT) of this request-response */
+    and measures the round-trip time (RTT) of this request-response */
     for (int i = 0; i < num_requests; i++) 
     {
         /* Use gettimeofday() to "start the timer" for the client's sent messsage */
@@ -83,8 +88,9 @@ void *client_thread_func(void *arg)
         gettimeofday(&end, NULL);
 
         /* Calculate the total number of microsends that have elapsed */
-        RTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-        data->total_rtt += RTT;
+        long singleRTT = 0;
+        singleRTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
+        data->total_rtt += singleRTT;
         data->total_messages += 1; 
     }
 
@@ -92,19 +98,19 @@ void *client_thread_func(void *arg)
 }
 
 /* This function orchestrates multiple client threads to send requests to a server,
-   collect performance data of each threads, and compute aggregated metrics of all threads */
+collect performance data of each threads, and compute aggregated metrics of all threads */
 void run_client() 
 {
     pthread_t threads[num_client_threads];
     client_thread_data_t thread_data[num_client_threads];
-    struct sockaddr_in server_addr;
 
-    /* Populate the server_addr struct so the client socket can connect to the server */
-    memset(thread_data, 0, sizeof(thread_data)); /* Zero out garbage data in the thread_data struct */
-    server_addr.sin_family = AF_INET; /* Internet address family */ 
-    server_addr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
-    server_addr.sin_port = htons(server_port); /* Server port */ 
-
+    /* Initialize server address struct in the client */
+    struct sockaddr_in ServAddr;  
+    memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
+    ServAddr.sin_family = AF_INET; /* Internet address family */ 
+    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
+    ServAddr.sin_port = htons(server_port); /* Server port */     
+    
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */    
     for (int i = 0; i < num_client_threads; i++)
@@ -115,7 +121,7 @@ void run_client()
             DieWithError("socket() failed");
         }              
         /* Establish the connection to the echo server */ 
-        if (connect(thread_data[i].client_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0)
+        if (connect(thread_data[i].client_fd, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0)
         {
             DieWithError("connect() failed"); 
         } 
@@ -166,7 +172,7 @@ void run_client()
 
 void run_server() 
 {
-    struct sockaddr_in ServAddr; /* Local address of server */ 
+    struct sockaddr_in ServAddr; 
     struct sockaddr_in ClntAddr; /* Client address */
     unsigned int clntLen; /* Length of client address data structure */
 
