@@ -1,0 +1,297 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <pthread.h>
+#include <errno.h>
+
+#define MAX_EVENTS 64
+#define MESSAGE_SIZE 16
+#define DEFAULT_CLIENT_THREADS 4
+#define NUM_REQUESTS 10000
+
+char *server_ip = "127.0.0.1";
+int server_port = 12345;
+int num_client_threads = DEFAULT_CLIENT_THREADS;
+int num_requests = NUM_REQUESTS;
+
+static void DieWithError(char *errorMessage) 
+{ 
+    perror(errorMessage); 
+    exit(1); 
+}  
+
+void HandleUDPClient(int clntSocket); /* UDP client handling function */ 
+int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
+
+/* This structure is used to store per-thread data in the client */
+typedef struct {
+    int epoll_fd;       /* File descriptor for the epoll instance, used for monitoring events on the socket. */
+    int client_fd;      /* File descriptor for the client socket on which data is sent to the server. */
+    long tx_count;       /* Accumulated number of sent packets for each thread */
+    long rx_count;       /* Accumulated number of recieved packets for each thread */
+} client_thread_data_t;
+
+/* This function runs in a separate client thread to handle communication with the server */ 
+void *client_thread_func(void *arg) 
+{
+    client_thread_data_t *data = (client_thread_data_t *)arg; /* Take the generic pointer arg, treat it as a pointer to client_thread_data_t, and store it in data */
+    struct epoll_event ev, events[MAX_EVENTS];
+    char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
+    char recv_buf[MESSAGE_SIZE];
+    struct timeval start, end;
+
+    /* Since UDP is connectionless, each packet must include the source and destination address */
+    struct sockaddr_in server_addr;  /* IPv4 address struct for server */
+    memset(data, 0, sizeof(data)); /* Zero out garbage data in the thread_data struct */
+    server_addr.sin_family = AF_INET; /* Internet address family */ 
+    server_addr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
+    server_addr.sin_port = htons(server_port); /* Server port */ 
+
+    /* We also initialize a structure that stores the source information for each
+    packet recieved by the client */
+    struct sockaddr_in from_addr; /* this gets populated later by the call to recvfrom() */
+
+    /* Initialize the ev struct for the client and round trip time (RTT) metrics */
+    ev.events = EPOLLIN;  /* listen for when the client has data available to read */
+    ev.data.fd = data->client_fd;  /* reads the client_fd field (the file descriptor for the socket) that this thread is handling.*/
+
+    /* Initialize the timeout calculation variables */
+    double SampleRTT = 0, EstimatedRTT = 0, DevRTT = 0, alpha = 0.125, beta = 0.25;
+    double TimeoutInterval = 1; /* initialize this to 1 second */
+
+    int thread_tx_count = 0, thread_rx_count = 0;
+
+    /* Register the CREATED but NOT CONNECTED socket from the interest list using epoll_ctl() */
+    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
+    {
+        DieWithError("failed to register client's connection socket to the interest list");
+    }
+
+    /* Since UDP is connectionless, a UDP client does not have to wait for a response from 
+    the server, therefore we must set the client file descriptor to non-blocking */
+    SetNonBlocking(data->client_fd);
+
+    /* Client thread simply blasts messsages to the server and doesn't wait for a response */
+    for (int i = 0; i < num_requests; i++) 
+    {
+        /* Use gettimeofday() to start the per-packet timer */
+        gettimeofday(&start, NULL);
+
+        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr) != MESSAGE_SIZE))
+        {
+            DieWithError("sendto() sent a different number of bytes than expected");
+        }            
+        
+        /* Immediately recieve the message from the server or timeout before sending another message */
+        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&from_addr, sizeof(from_addr) != MESSAGE_SIZE))
+        {
+            DieWithError("recvfrom() failed or connection closed prematurely");
+        } 
+        
+        /* Use gettimeofday() to "stop the timer" and calculate SampleRTT */
+        gettimeofday(&end, NULL);
+
+        /* SampleRTT is cacluated calculated using the gettimeofday() function and the timeval struct */
+        SampleRTT = (end.tv_sec - start.tv_sec)*NUM_REQUESTS + (end.tv_usec - start.tv_usec);
+
+        /* Upon obtaining a new SampleRTT, we update EstimatedRTT according to the formula below */
+        EstimatedRTT = (1 - alpha)*EstimatedRTT + alpha*(SampleRTT);
+
+        /* We calculate DevRTT be an estimate of how much Sample RTT typically deviates from EstimatedRTT */
+        DevRTT = (1 - beta)*DevRTT + beta*abs(SampleRTT - EstimatedRTT);
+
+        /* Now can use the formula to caluclate the timeout interval for a given UDP datagram */
+        if (i != 0) /* ensure the TimeoutInterval for the first packet sent is 1 second */
+        {
+            TimeoutInterval = EstimatedRTT + 4*(DevRTT);
+        }
+        
+        /* Use the TimeoutInterval to determine if we lost a packet or not */
+        if (EstimatedRTT >= TimeoutInterval) /* we timed out, only update the number of packets sent, not recieved */
+        {
+            data->tx_count ++;
+            TimeoutInterval *= 2;  /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+        }
+        else /* no time out */
+        {
+            data->tx_count ++;
+            data->rx_count ++;
+        }
+    }
+
+    return NULL;
+}
+
+/* This function orchestrates multiple client threads to send requests to a server,
+collect performance data of each threads, and compute aggregated metrics of all threads */
+void run_client() 
+{
+    pthread_t threads[num_client_threads];
+    client_thread_data_t thread_data[num_client_threads];
+    struct sockaddr_in server_addr;
+
+    /* Create sockets and epoll instances for client threads
+    and connect these sockets of client threads to the server */    
+    for (int i = 0; i < num_client_threads; i++)
+    {
+        /* Create an unreliable, UDP datagram socket using UDP */ 
+        if ((thread_data[i].client_fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+        {
+            DieWithError("socket() failed");
+        }
+
+        /* Create the interest list (aka the epoll instance) for the client thread */
+        thread_data[i].epoll_fd = epoll_create(1);
+        if (thread_data[i].epoll_fd == -1) 
+        {
+            DieWithError("failed to create the epoll instance for client");
+        }
+        /* Pass the thread_data to pthread_create() */   
+        pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
+    }
+
+    /* Wait for client threads to complete and aggregate metrics of all client threads */
+    puts("==============================================================");
+    for (int i = 0; i < num_client_threads; i++) 
+    {
+        pthread_join(threads[i], NULL);
+        /* initialize per-thread data*/       
+        long thread_tx_cnt = thread_data[i].tx_count;
+        int thread_rx_cnt = thread_data[i].rx_count;
+        long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
+        
+        printf("Results For Thread %d: \n\n", threads[i]);
+        printf("Total packets sent: %ld \n", thread_tx_cnt);
+        printf("Total packets recieved: %ld \n", thread_rx_cnt);
+        printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
+        puts("==============================================================");
+    }
+}
+
+void run_server() 
+{
+    struct sockaddr_in ServAddr; /* Local address of server */ 
+    struct sockaddr_in ClntAddr; /* Client address */     
+    unsigned int clntLen; /* Length of client address data structure */
+
+    /* Create socket for incoming connections */ 
+    int listenSock; /* Socket descriptor for server */ 
+    int connSock; /* Socket descriptor for client */
+
+    /* Initialize the event struct for the server*/
+    struct epoll_event ev, events[MAX_EVENTS];
+    ev.events = EPOLLIN; /* The server is listening for read operation */
+
+    if ((listenSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+    {
+        DieWithError("socket() failed");
+    }
+    /* Set the file descriptor for the server to be the listening socket */
+    ev.data.fd = listenSock;
+
+    /* Construct local address structure */ 
+    memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
+    ServAddr.sin_family = AF_INET; /* Internet address family */ 
+    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
+    ServAddr.sin_port = htons(server_port); /* Server port */     
+
+    /* Bind to the local address */ 
+    if (bind(listenSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
+    {
+        DieWithError ("bind() failed");
+    }          
+    /* Mark the socket so it will listen for incoming connections */ 
+    if (listen(listenSock, MAX_EVENTS) < 0)
+    {
+        DieWithError("listen() failed");
+    } 
+
+    /* Set listening socket to non-blocking to prevent a race condition between the client’s 
+    connection state and the server’s call to accept() */
+    SetNonBlocking(listenSock);        
+
+    /* Create the epoll instance for the server */
+    int server_fd = epoll_create(1);
+    if (server_fd < 0) 
+    {
+        DieWithError("failed to the created the epoll instance for server");
+    }   
+    /* Register the listening socket to epoll */
+    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, listenSock, &ev) < 0) 
+    {
+        DieWithError("failed to register server's listening socket to the interest list");
+    }        
+    /* Server's run-to-completion event loop */
+    while (1) 
+    {
+        clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
+        int nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1); /* number of ready fds in our epoll interest list*/
+
+        if (nfds < 0)
+        {
+            DieWithError("epoll_wait() error");
+        }
+
+        for (int n = 0; n < nfds; ++n) 
+        {
+            /* Check if the incoming message is a connection request from a new client */
+            if (events[n].data.fd == listenSock) 
+            {
+                /* Accept all waiting clients in one go */
+                while ((connSock = accept(listenSock, (struct sockaddr *)&ClntAddr, &clntLen)) >= 0) 
+                {
+                    /* Set the connection socket to non-blocking to prevent the server from waiting too long
+                    for one client's data to be ready */
+                    SetNonBlocking(connSock);
+                    ev.data.fd = connSock;
+
+                    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, connSock, &ev) < 0) 
+                    {
+                        DieWithError("failed to register connection socket");
+                    }
+                }
+                /* After the loop, check if we stopped because the queue is empty */
+                if (connSock < 0 && errno != EAGAIN) 
+                {
+                    DieWithError("accept() failed unexpectedly");
+                }
+            } 
+            /* Handle existing connections to clients */
+            else 
+            {
+                HandleTCPClient(events[n].data.fd);
+            }               
+        }       
+    }
+}
+
+int main(int argc, char *argv[]) 
+{
+    if (argc > 1 && strcmp(argv[1], "server") == 0) 
+    {
+        if (argc > 2) server_ip = argv[2];
+        if (argc > 3) server_port = atoi(argv[3]);
+
+        run_server();
+    } 
+    else if (argc > 1 && strcmp(argv[1], "client") == 0) 
+    {
+        if (argc > 2) server_ip = argv[2];
+        if (argc > 3) server_port = atoi(argv[3]);
+        if (argc > 4) num_client_threads = atoi(argv[4]);
+        if (argc > 5) num_requests = atoi(argv[5]);
+
+        run_client();
+    } 
+    else 
+    {
+        printf("Usage: %s <server|client> [server_ip server_port num_client_threads num_requests]\n", argv[0]);
+    }
+
+    return 0;
+}
