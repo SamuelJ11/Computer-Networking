@@ -46,7 +46,6 @@ void *client_thread_func(void *arg)
 
     /* Since UDP is connectionless, each packet must include the source and destination address */
     struct sockaddr_in ServAddr;  /* IPv4 address struct for server */
-    memset(data, 0, sizeof(data)); /* Zero out garbage data in the thread_data struct */
     ServAddr.sin_family = AF_INET; /* Internet address family */ 
     ServAddr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
     ServAddr.sin_port = htons(server_port); /* Server port */ 
@@ -54,7 +53,7 @@ void *client_thread_func(void *arg)
     /* We also initialize a structure that stores the source information for each
     packet recieved by the client */
     struct sockaddr_in FromAddr; /* this gets populated later by the call to recvfrom() */
-
+    unsigned int fromSize; /* variable to hold size of FromAddr struct */
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;  /* listen for when the client has data available to read */
     ev.data.fd = data->client_fd;  /* reads the client_fd field (the file descriptor for the socket) that this thread is handling.*/
@@ -70,24 +69,22 @@ void *client_thread_func(void *arg)
     {
         DieWithError("failed to register client's connection socket to the interest list");
     }
-
-    /* Since UDP is connectionless, a UDP client does not have to wait for a response from 
-    the server, therefore we must set the client file descriptor to non-blocking */
-    SetNonBlocking(data->client_fd);
-
+  
     /* Client thread simply blasts messsages to the server and doesn't wait for a response */
     for (int i = 0; i < num_requests; i++) 
     {
         /* Use gettimeofday() to start the per-packet timer */
         gettimeofday(&start, NULL);
 
-        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr) != MESSAGE_SIZE))
+        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
         {
             DieWithError("sendto() sent a different number of bytes than expected");
         }            
         
+        fromSize = sizeof(FromAddr);
+        
         /* Immediately recieve the message from the server or timeout before sending another message */
-        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&FromAddr, sizeof(FromAddr) != MESSAGE_SIZE))
+        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&FromAddr, &fromSize) != MESSAGE_SIZE)
         {
             DieWithError("recvfrom() failed or connection closed prematurely");
         } 
