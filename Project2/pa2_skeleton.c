@@ -12,7 +12,7 @@
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 10000
+#define NUM_REQUESTS 1000000
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
@@ -35,18 +35,53 @@ typedef struct {
     long rx_count;       /* Accumulated number of recieved packets for each thread */
 } client_thread_data_t;
 
+/* Initialize a struct to hold the timeout calculation variables */
+typedef struct {
+    double SampleRTT;
+    double EstimatedRTT;
+    double DevRTT;
+    double alpha;
+    double beta;
+    double TimeoutInterval;
+} calcTimeIntval;
+
+void TimeInterval(calcTimeIntval *p, struct timeval *s, struct timeval *e);
+
 /* This function runs in a separate client thread to handle communication with the server */ 
 void *client_thread_func(void *arg) 
 {
-    client_thread_data_t *data = (client_thread_data_t *)arg; /* Take the generic pointer arg, treat it as a pointer to client_thread_data_t, and store it in data */
-   
+    client_thread_data_t *data = (client_thread_data_t *)arg; /* initialize client_thread_data_t struct within the thread */
+    calcTimeIntval packetdata; /* initialize calcTimeIntval struct */
+
     /* Zero out accumulation metrics */
     data->tx_count = 0;
     data->rx_count = 0;
 
+    /* Zero out timeout metrics, set initial timeout interval to 1 second (1000000 µs) */
+    memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
+    packetdata.alpha = 0.125;
+    packetdata.beta = 0.25;
+    packetdata.EstimatedRTT = 100;
+    packetdata.TimeoutInterval = 1000000;
+
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
+    struct epoll_event ev, events[MAX_EVENTS];
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
+    char recv_buf[MESSAGE_SIZE];
     struct timeval start, end;
+
+    /* Set client_fd to non-blocking when epoll starts watching it*/
+    SetNonBlocking(data->client_fd);
+
+    /* Initialize the ev struct for the client and round trip time (RTT) metrics */
+    ev.events = EPOLLIN;
+    ev.data.fd = data->client_fd;
+
+    /* Register the connected socket from the interest list using epoll_ctl() */
+    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
+    {
+        DieWithError("failed to register client's connection socket to the interest list");
+    }
 
     /* Since UDP is connectionless, each packet must include the source and destination address */
     struct sockaddr_in ServAddr;  /* IPv4 address struct for server */
@@ -54,11 +89,11 @@ void *client_thread_func(void *arg)
     ServAddr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
     ServAddr.sin_port = htons(server_port); /* Server port */ 
 
-    /* Initialize the timeout calculation variables */
-    double SampleRTT = 0, EstimatedRTT = 0, DevRTT = 0, alpha = 0.125, beta = 0.25;
-    double TimeoutInterval = 1000000; /* initialize this to 1 second */
+    /* Initialize the struct that recvfrom() will populate */
+    struct sockaddr_in fromAddr;
+    socklen_t fromLen = sizeof(fromAddr);
 
-    /* Client thread simply blasts messsages to the server and doesn't wait for a response */
+    /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
     for (int i = 0; i < num_requests; i++) 
     {
         /* Use gettimeofday() to start the per-packet timer */
@@ -67,36 +102,30 @@ void *client_thread_func(void *arg)
         if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
         {
             DieWithError("sendto() sent a different number of bytes than expected");
-        }            
-        
-        /* Use gettimeofday() to "stop the timer" and calculate SampleRTT */
-        gettimeofday(&end, NULL);
-
-        /* SampleRTT is cacluated calculated using the gettimeofday() function and the timeval struct */
-        SampleRTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-
-        /* Upon obtaining a new SampleRTT, we update EstimatedRTT according to the formula below */
-        EstimatedRTT = (1 - alpha)*EstimatedRTT + alpha*(SampleRTT);
-
-        /* We calculate DevRTT be an estimate of how much Sample RTT typically deviates from EstimatedRTT */
-        DevRTT = (1 - beta)*DevRTT + beta*abs(SampleRTT - EstimatedRTT);
-
-        /* Now can use the formula to caluclate the timeout interval for a given UDP datagram */
-        if (i != 0) /* ensure the TimeoutInterval for the first packet sent is 1 second */
-        {
-            TimeoutInterval = EstimatedRTT + 4*(DevRTT);
         }
+
+        /* Update the timout interval for epoll for each request */
+        int timeout_ms = packetdata.TimeoutInterval / 1000;
         
-        /* Use the TimeoutInterval to determine if we lost a packet or not */
-        if (EstimatedRTT >= TimeoutInterval) /* we timed out, only update the number of packets sent, not recieved */
+        /* Wait until a packet arrives on the socket OR until the timeout expires */
+        int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);
+        if (nfds > 0) /* No time out */
         {
-            data->tx_count ++;
-            TimeoutInterval *= 2;  /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
-        }
-        else /* no time out */
-        {
+            recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
+            gettimeofday(&end, NULL);
+            TimeInterval(&packetdata, &start, &end);  /* recalculate the timeout interval using the TimeInterval() function */
+
             data->tx_count ++;
             data->rx_count ++;
+        }
+        else if (nfds == 0) /* timeout (packet loss) */
+        {
+            data->tx_count++;
+            packetdata.TimeoutInterval *= 2;  /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+        }
+        else
+        {
+             DieWithError("epoll_wait() failed");
         }
     }
 
@@ -190,7 +219,7 @@ void run_server()
         {
             DieWithError("recvfrom() failed or connection closed prematurely");
         }
-
+        
         sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
         if (sentMsgSize != recvMsgSize)
