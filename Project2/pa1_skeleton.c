@@ -160,10 +160,10 @@ void run_client()
         pthread_join(threads[i], NULL);
         /* initialize per-thread data*/       
         long thread_tx_cnt = thread_data[i].tx_count;
-        int thread_rx_cnt = thread_data[i].rx_count;
+        long thread_rx_cnt = thread_data[i].rx_count;
         long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
         
-        printf("Results For Thread %d: \n\n", threads[i]);
+        printf("Results For Thread %ld: \n\n", threads[i]);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
         printf("Total packets recieved: %ld \n", thread_rx_cnt);
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
