@@ -90,7 +90,7 @@
 
     • In order to estimate a typical RTT, it is therefore natural to take some sort of average of the recorded RTT values. TCP maintains an average, called 'EstimatedRTT', of the individual RTT values. Upon obtaining a new RTT, TCP updates EstimatedRTT according to the following formula:
 
-        Estimated RR = (1 - α).EstimatedRR + α.(RTT)
+        Estimated RTT = (1 - α).EstimatedRTT + α.(RTT)
 
         - this states that the new estimate is mostly based on the rolling average (1 - α), plus a tiny bit of the most recent RTT (α)
 
@@ -100,7 +100,7 @@
 
         - here we define 'DevRTT to be an estimate of how much Sample RTT typically deviates from EstimatedRTT via the formula:
 
-            DevRTT = (1 - B).DevRTT + (B).abs(SampleRTT - EstimatedRTT)
+            DevRTT = (1 - β).DevRTT + (β).abs(SampleRTT - EstimatedRTT)
 
         - the recommended value of β is 0.25
 
