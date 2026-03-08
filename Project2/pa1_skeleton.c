@@ -25,7 +25,6 @@ static void DieWithError(char *errorMessage)
     exit(1); 
 }  
 
-void HandleUDPClient(int clntSocket); /* UDP client handling function */ 
 int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
 
 /* This structure is used to store per-thread data in the client */
@@ -46,15 +45,15 @@ void *client_thread_func(void *arg)
     struct timeval start, end;
 
     /* Since UDP is connectionless, each packet must include the source and destination address */
-    struct sockaddr_in server_addr;  /* IPv4 address struct for server */
+    struct sockaddr_in ServAddr;  /* IPv4 address struct for server */
     memset(data, 0, sizeof(data)); /* Zero out garbage data in the thread_data struct */
-    server_addr.sin_family = AF_INET; /* Internet address family */ 
-    server_addr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
-    server_addr.sin_port = htons(server_port); /* Server port */ 
+    ServAddr.sin_family = AF_INET; /* Internet address family */ 
+    ServAddr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
+    ServAddr.sin_port = htons(server_port); /* Server port */ 
 
     /* We also initialize a structure that stores the source information for each
     packet recieved by the client */
-    struct sockaddr_in from_addr; /* this gets populated later by the call to recvfrom() */
+    struct sockaddr_in FromAddr; /* this gets populated later by the call to recvfrom() */
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;  /* listen for when the client has data available to read */
@@ -82,13 +81,13 @@ void *client_thread_func(void *arg)
         /* Use gettimeofday() to start the per-packet timer */
         gettimeofday(&start, NULL);
 
-        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&server_addr, sizeof(server_addr) != MESSAGE_SIZE))
+        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr) != MESSAGE_SIZE))
         {
             DieWithError("sendto() sent a different number of bytes than expected");
         }            
         
         /* Immediately recieve the message from the server or timeout before sending another message */
-        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&from_addr, sizeof(from_addr) != MESSAGE_SIZE))
+        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&FromAddr, sizeof(FromAddr) != MESSAGE_SIZE))
         {
             DieWithError("recvfrom() failed or connection closed prematurely");
         } 
@@ -133,7 +132,6 @@ void run_client()
 {
     pthread_t threads[num_client_threads];
     client_thread_data_t thread_data[num_client_threads];
-    struct sockaddr_in server_addr;
 
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */    
@@ -178,51 +176,46 @@ void run_server()
     struct sockaddr_in ServAddr; /* Local address of server */ 
     struct sockaddr_in ClntAddr; /* Client address */     
     unsigned int clntLen; /* Length of client address data structure */
+    char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
 
     /* Create socket for incoming connections */ 
-    int listenSock; /* Socket descriptor for server */ 
-    int connSock; /* Socket descriptor for client */
+    int UDPSock; /* Socket descriptor for server */ 
 
     /* Initialize the event struct for the server*/
     struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN; /* The server is listening for read operation */
 
-    if ((listenSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+    if ((UDPSock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
     {
         DieWithError("socket() failed");
     }
     /* Set the file descriptor for the server to be the listening socket */
-    ev.data.fd = listenSock;
+    ev.data.fd = UDPSock;
 
     /* Construct local address structure */ 
     memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
     ServAddr.sin_family = AF_INET; /* Internet address family */ 
     ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    ServAddr.sin_port = htons(server_port); /* Server port */     
+    ServAddr.sin_port = htons(server_port); /* Server port */ 
+    
+    /* We also initialize a structure that stores the source information for each
+    packet recieved by the client */
+    struct sockaddr_in FromAddr; /* this gets populated later by the call to recvfrom() */
 
     /* Bind to the local address */ 
-    if (bind(listenSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
+    if (bind(UDPSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
     {
         DieWithError ("bind() failed");
     }          
-    /* Mark the socket so it will listen for incoming connections */ 
-    if (listen(listenSock, MAX_EVENTS) < 0)
-    {
-        DieWithError("listen() failed");
-    } 
-
-    /* Set listening socket to non-blocking to prevent a race condition between the client’s 
-    connection state and the server’s call to accept() */
-    SetNonBlocking(listenSock);        
-
+    
     /* Create the epoll instance for the server */
     int server_fd = epoll_create(1);
     if (server_fd < 0) 
     {
         DieWithError("failed to the created the epoll instance for server");
     }   
-    /* Register the listening socket to epoll */
-    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, listenSock, &ev) < 0) 
+    /* Register the UDP socket to epoll */
+    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
     {
         DieWithError("failed to register server's listening socket to the interest list");
     }        
@@ -238,34 +231,15 @@ void run_server()
         }
 
         for (int n = 0; n < nfds; ++n) 
-        {
-            /* Check if the incoming message is a connection request from a new client */
-            if (events[n].data.fd == listenSock) 
+        {   
+            if (recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(FromAddr) != MESSAGE_SIZE))
             {
-                /* Accept all waiting clients in one go */
-                while ((connSock = accept(listenSock, (struct sockaddr *)&ClntAddr, &clntLen)) >= 0) 
-                {
-                    /* Set the connection socket to non-blocking to prevent the server from waiting too long
-                    for one client's data to be ready */
-                    SetNonBlocking(connSock);
-                    ev.data.fd = connSock;
-
-                    if (epoll_ctl(server_fd, EPOLL_CTL_ADD, connSock, &ev) < 0) 
-                    {
-                        DieWithError("failed to register connection socket");
-                    }
-                }
-                /* After the loop, check if we stopped because the queue is empty */
-                if (connSock < 0 && errno != EAGAIN) 
-                {
-                    DieWithError("accept() failed unexpectedly");
-                }
+                DieWithError("recvfrom() failed or connection closed prematurely");
             } 
-            /* Handle existing connections to clients */
-            else 
+            if (sendto(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr) != MESSAGE_SIZE))
             {
-                HandleTCPClient(events[n].data.fd);
-            }               
+                DieWithError("sendto() sent a different number of bytes than expected");
+            }                  
         }       
     }
 }
