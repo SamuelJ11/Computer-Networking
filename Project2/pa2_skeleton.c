@@ -12,7 +12,7 @@
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 1000000
+#define NUM_REQUESTS 10000
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
@@ -45,7 +45,6 @@ void *client_thread_func(void *arg)
     data->rx_count = 0;
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
-    struct epoll_event ev;
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
     struct timeval start, end;
 
@@ -55,20 +54,10 @@ void *client_thread_func(void *arg)
     ServAddr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
     ServAddr.sin_port = htons(server_port); /* Server port */ 
 
-    /* Initialize the ev struct for the client and round trip time (RTT) metrics */
-    ev.events = EPOLLIN;  /* listen for when the client has data available to read */
-    ev.data.fd = data->client_fd;  /* reads the client_fd field (the file descriptor for the socket) that this thread is handling.*/
-
     /* Initialize the timeout calculation variables */
     double SampleRTT = 0, EstimatedRTT = 0, DevRTT = 0, alpha = 0.125, beta = 0.25;
     double TimeoutInterval = 1000000; /* initialize this to 1 second */
 
-    /* Register the CREATED but NOT CONNECTED socket from the interest list using epoll_ctl() */
-    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
-    {
-        DieWithError("failed to register client's connection socket to the interest list");
-    }
-  
     /* Client thread simply blasts messsages to the server and doesn't wait for a response */
     for (int i = 0; i < num_requests; i++) 
     {
