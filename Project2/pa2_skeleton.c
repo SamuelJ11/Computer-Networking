@@ -11,7 +11,7 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 4
+#define DEFAULT_CLIENT_THREADS 1
 #define NUM_REQUESTS 10000
 
 char *server_ip = "127.0.0.1";
@@ -39,9 +39,14 @@ typedef struct {
 void *client_thread_func(void *arg) 
 {
     client_thread_data_t *data = (client_thread_data_t *)arg; /* Take the generic pointer arg, treat it as a pointer to client_thread_data_t, and store it in data */
-    struct epoll_event ev, events[MAX_EVENTS];
+   
+    /* Zero out accumulation metrics */
+    data->tx_count = 0;
+    data->rx_count = 0;
+
+    /* Variables for epoll events, sending/receiving messages, and measuring RTT */
+    struct epoll_event ev;
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
-    char recv_buf[MESSAGE_SIZE];
     struct timeval start, end;
 
     /* Since UDP is connectionless, each packet must include the source and destination address */
@@ -50,19 +55,13 @@ void *client_thread_func(void *arg)
     ServAddr.sin_addr.s_addr = inet_addr(server_ip); /* Server IP address */
     ServAddr.sin_port = htons(server_port); /* Server port */ 
 
-    /* We also initialize a structure that stores the source information for each
-    packet recieved by the client */
-    struct sockaddr_in FromAddr; /* this gets populated later by the call to recvfrom() */
-    unsigned int fromSize; /* variable to hold size of FromAddr struct */
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;  /* listen for when the client has data available to read */
     ev.data.fd = data->client_fd;  /* reads the client_fd field (the file descriptor for the socket) that this thread is handling.*/
 
     /* Initialize the timeout calculation variables */
     double SampleRTT = 0, EstimatedRTT = 0, DevRTT = 0, alpha = 0.125, beta = 0.25;
-    double TimeoutInterval = 1; /* initialize this to 1 second */
-
-    int thread_tx_count = 0, thread_rx_count = 0;
+    double TimeoutInterval = 1000000; /* initialize this to 1 second */
 
     /* Register the CREATED but NOT CONNECTED socket from the interest list using epoll_ctl() */
     if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
@@ -81,19 +80,11 @@ void *client_thread_func(void *arg)
             DieWithError("sendto() sent a different number of bytes than expected");
         }            
         
-        fromSize = sizeof(FromAddr);
-        
-        /* Immediately recieve the message from the server or timeout before sending another message */
-        if (recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&FromAddr, &fromSize) != MESSAGE_SIZE)
-        {
-            DieWithError("recvfrom() failed or connection closed prematurely");
-        } 
-        
         /* Use gettimeofday() to "stop the timer" and calculate SampleRTT */
         gettimeofday(&end, NULL);
 
         /* SampleRTT is cacluated calculated using the gettimeofday() function and the timeval struct */
-        SampleRTT = (end.tv_sec - start.tv_sec)*NUM_REQUESTS + (end.tv_usec - start.tv_usec);
+        SampleRTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
 
         /* Upon obtaining a new SampleRTT, we update EstimatedRTT according to the formula below */
         EstimatedRTT = (1 - alpha)*EstimatedRTT + alpha*(SampleRTT);
@@ -160,7 +151,7 @@ void run_client()
         long thread_rx_cnt = thread_data[i].rx_count;
         long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
         
-        printf("Results For Thread %ld: \n\n", threads[i]);
+        printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
         printf("Total packets recieved: %ld \n", thread_rx_cnt);
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
@@ -196,16 +187,16 @@ void run_server()
     ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
     ServAddr.sin_port = htons(server_port); /* Server port */ 
     
-    /* We also initialize a structure that stores the source information for each
-    packet recieved by the client */
-    struct sockaddr_in FromAddr; /* this gets populated later by the call to recvfrom() */
-
     /* Bind to the local address */ 
     if (bind(UDPSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
     {
         DieWithError ("bind() failed");
-    }          
-    
+    } 
+
+    /* Set UDP socket to non-blocking to ensure recvfrom() returns immediately if no 
+    data is ready, rather than freezing the thread */
+    SetNonBlocking(UDPSock);    
+
     /* Create the epoll instance for the server */
     int server_fd = epoll_create(1);
     if (server_fd < 0) 
@@ -223,18 +214,18 @@ void run_server()
         clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
         int nfds;  /* number of ready fds in our epoll interest list*/
     
-        if (nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0)
+        if ((nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1)) < 0)
         {
             DieWithError("epoll_wait() error");
         }
 
         for (int n = 0; n < nfds; ++n) 
         {   
-            if (recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(FromAddr) != MESSAGE_SIZE))
+            if ((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) != MESSAGE_SIZE)
             {
                 DieWithError("recvfrom() failed or connection closed prematurely");
             } 
-            if (sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr) != recvMsgSize))
+            if ((sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr)) != recvMsgSize))
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }                  
