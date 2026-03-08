@@ -232,7 +232,7 @@ void run_server()
 
         if (nfds < 0)
         {
-            DieWithError("epoll_wait() error");
+            DieWithError("epoll_wait() failed");
         }
 
         for (int n = 0; n < nfds; ++n) 
