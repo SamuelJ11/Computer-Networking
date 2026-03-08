@@ -16,7 +16,7 @@
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
 int num_client_threads = DEFAULT_CLIENT_THREADS;
-int num_requests = 1000000;
+int num_requests = 100000;
 
 static void DieWithError(char *errorMessage) 
 { 
