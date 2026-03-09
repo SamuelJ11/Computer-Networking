@@ -151,7 +151,7 @@ void *client_thread_func(void *arg)
                 /* Check if server is still running by ensuring a timout of 5 seconds is not exceeded */
                 if (packetdata.TimeoutInterval > 5000) /* 5 seconds */
                 {
-                    puts("server is not responding: Timeout exceeded");
+                    puts("server is not responding: Maximum timeout exceeded");
                     exit(1);
                 }
 
