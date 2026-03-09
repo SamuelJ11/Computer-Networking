@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <errno.h>
+#include <signal.h>
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
@@ -19,11 +20,35 @@ int server_port = 12345;
 int num_client_threads = DEFAULT_CLIENT_THREADS;
 int num_requests = NUM_REQUESTS;
 
+volatile sig_atomic_t stop = 0; /* used for the signal handler we install later */
+
+/* Create a type alias named sighandler_t to simplify call to Signal() */
+typedef void (*sighandler_t)(int);
+
+/* Simple atomic signal handler */
+void mysighandler(int signal)
+{
+    stop = 1;
+}
+
 static void DieWithError(char *errorMessage) 
 { 
     perror(errorMessage); 
     exit(1); 
-}  
+}
+
+/* Implement a wrapper function called Signal() that handles the unwiedly sigaction() function call */
+void Signal(int signum, sighandler_t handler)
+{
+    struct sigaction new_action;
+    new_action.sa_handler = handler;        // assigns the function pointer passed to the wrapper to the handler field
+    sigfillset(&new_action.sa_mask);        // initializes the set to include every possible signal (all bits are 1)
+
+    if (sigaction(signum, &new_action, NULL) < 0)
+    {
+        DieWithError("sigaction() failed");
+    }
+}
 
 void HandleTCPClient(int clntSocket); /* TCP client handling function */ 
 void SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
@@ -181,6 +206,9 @@ void run_server()
     int listenSock; /* Socket descriptor for server */ 
     int connSock; /* Socket descriptor for client */
 
+    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    Signal(SIGINT, mysighandler);
+
     /* Initialize the event struct for the server*/
     struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN; /* The server is listening for read operation */
@@ -225,12 +253,12 @@ void run_server()
         DieWithError("failed to register server's listening socket to the interest list");
     }        
     /* Server's run-to-completion event loop */
-    while (1) 
+    while (!stop) 
     {
         clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
         int nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1); /* number of ready fds in our epoll interest list*/
 
-        if (nfds < 0)
+        if (nfds < 0 && errno != EINTR)
         {
             DieWithError("epoll_wait() failed");
         }
@@ -266,6 +294,10 @@ void run_server()
             }               
         }       
     }
+
+    puts("Server is shutting down, closing all connections ...");
+    epoll_ctl(server_fd, EPOLL_CTL_DEL, listenSock, NULL); /* remove the server's listening socket from the interest list */
+    close(listenSock);
 }
 
 int main(int argc, char *argv[]) 
