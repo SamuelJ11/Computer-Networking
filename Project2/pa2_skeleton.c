@@ -9,6 +9,8 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include "TimeInterval.h"
+
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
@@ -35,24 +37,13 @@ typedef struct {
     long rx_count;       /* Accumulated number of recieved packets for each thread */
 } client_thread_data_t;
 
-/* Initialize a struct to hold the timeout calculation variables */
-typedef struct {
-    double SampleRTT;
-    double EstimatedRTT;
-    double DevRTT;
-    double alpha;
-    double beta;
-    double TimeoutInterval;
-} calcTimeIntval;
-
-void TimeInterval(calcTimeIntval *p, struct timeval *s, struct timeval *e);
-
 /* This function runs in a separate client thread to handle communication with the server */ 
 void *client_thread_func(void *arg) 
 {
     client_thread_data_t *data = (client_thread_data_t *)arg; /* initialize client_thread_data_t struct within the thread */
     calcTimeIntval packetdata; /* initialize calcTimeIntval struct */
-
+    long long starttime = 0, endtime = 0; /* used for passing start and endtimes to TimeInterval function */
+   
     /* Zero out accumulation metrics */
     data->tx_count = 0;
     data->rx_count = 0;
@@ -105,15 +96,22 @@ void *client_thread_func(void *arg)
         }
 
         /* Update the timout interval for epoll for each request */
-        int timeout_ms = packetdata.TimeoutInterval / 1000;
+        int timeout_ms = packetdata.TimeoutInterval;
         
         /* Wait until a packet arrives on the socket OR until the timeout expires */
         int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);
+
         if (nfds > 0) /* No time out */
         {
             recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
             gettimeofday(&end, NULL);
-            TimeInterval(&packetdata, &start, &end);  /* recalculate the timeout interval using the TimeInterval() function */
+
+            /* Extract the start and end times to pass to TimeInterval() function */
+            starttime = start.tv_sec*(1000) + (start.tv_usec / 1000);
+            endtime = end.tv_sec*(1000) + (end.tv_usec / 1000);
+
+            /* Recalculate the timeout interval using the TimeInterval() function */
+            TimeInterval(&packetdata, &starttime, &endtime);  
 
             data->tx_count ++;
             data->rx_count ++;
