@@ -212,7 +212,7 @@ void run_client()
     puts("==============================================================");
 
     /* Close all client sockets */
-    puts("Client is shutting down, closing all thread sockets ...");
+    puts("client is shutting down, closing all thread sockets ...");
     for (int i = 0; i < num_threads_created; i++)
     {
         if (thread_data[i].client_fd > 0) /* socket is open */
@@ -319,14 +319,14 @@ void run_server()
         }       
     }
 
-    puts("Server is shutting down, closing all connections ...");
+    puts("server is shutting down, closing all connections ...");
     epoll_ctl(server_fd, EPOLL_CTL_DEL, listenSock, NULL); /* remove the server's listening socket from the interest list */
     close(listenSock);
 }
 
 int main(int argc, char *argv[]) 
 {
-    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    /* Install the signal handler to handle SIGINT and SIGTERM */
     Signal(SIGINT, mysighandler);
     Signal(SIGTERM, mysighandler);
 
