@@ -109,7 +109,7 @@ void *client_thread_func(void *arg)
             /* Wait (block) until the message is recieved from the server before sending another message */
             if ((recv(data->client_fd, recv_buf, MESSAGE_SIZE, 0)) < 0)
             {
-                DieWithError("recv() failed or connection closed prematurely");
+                DieWithError("recv() failed or server connection closed prematurely");
             } 
             
             /* Use gettimeofday() to "stop the timer" and record the RTT time */
