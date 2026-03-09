@@ -77,8 +77,8 @@ void *client_thread_func(void *arg)
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
     packetdata.alpha = 0.125; /* textbook value */
     packetdata.beta = 0.25; /* textbook value */
-    packetdata.EstimatedRTT = 100; /* time in ms */
-    packetdata.TimeoutInterval = 1000; /* time in ms */
+    packetdata.EstimatedRTT = 1000; /* time in µs */
+    packetdata.TimeoutInterval = 10000; /* time in µs */
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
@@ -135,9 +135,9 @@ void *client_thread_func(void *arg)
                 recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
                 gettimeofday(&end, NULL);
 
-                /* Extract the start and end times to pass to TimeInterval() function */
-                starttime = start.tv_sec*(1000) + (start.tv_usec / 1000);
-                endtime = end.tv_sec*(1000) + (end.tv_usec / 1000);
+                /* Extract the start and end times (in µs)to pass to TimeInterval() function */
+                starttime = start.tv_sec*(1000000) + (start.tv_usec);
+                endtime = end.tv_sec*(1000000) + (end.tv_usec);
 
                 /* Recalculate the timeout interval using the TimeInterval() function */
                 TimeInterval(&packetdata, &starttime, &endtime);  
@@ -145,6 +145,12 @@ void *client_thread_func(void *arg)
                 /* Update both send and recieve counts */
                 data->tx_count ++;
                 data->rx_count ++;
+
+                /* Testing purposes only, delete later*/
+                if (i % (NUM_REQUESTS / 10) == 0) /* print out metrics every 10% of the total number of requests */
+                {
+                    printf("Updated timeout interval for socket %d; timeout now %.2f µs\n", data->client_fd, packetdata.TimeoutInterval);
+                }
             }
             else if (nfds == 0) /* timeout (packet loss) */
             {
