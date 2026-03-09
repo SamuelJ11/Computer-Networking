@@ -148,6 +148,13 @@ void *client_thread_func(void *arg)
             }
             else if (nfds == 0) /* timeout (packet loss) */
             {
+                /* Check if server is still running by ensuring a timout of 5 seconds is not exceeded */
+                if (packetdata.TimeoutInterval > 5000) /* 5 seconds */
+                {
+                    puts("server is not responding: Timeout exceeded");
+                    exit(1);
+                }
+
                 data->tx_count++; /* only update the sent count */
                 packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
             }
@@ -219,7 +226,7 @@ void run_client()
     }
     
     /* Close all client sockets */
-    puts("Client is shutting down, closing all thread sockets ...");
+    puts("client is shutting down, closing all thread sockets ...");
     for (int i = 0; i < num_threads_created; i++)
     {
         if (thread_data[i].client_fd > 0) /* socket is open */
@@ -309,13 +316,13 @@ void run_server()
         }                
     }
 
-    puts("Server is shutting down, closing UDP listening socket ...");
+    puts("server is shutting down, closing UDP listening socket ...");
     close(UDPSock);
 }
 
 int main(int argc, char *argv[]) 
 {
-    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    /* Install the signal handler to handle SIGINT and SIGTERM */
     Signal(SIGINT, mysighandler);
     Signal(SIGTERM, mysighandler);
 

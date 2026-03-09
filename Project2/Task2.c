@@ -315,7 +315,7 @@ void run_server()
 
 int main(int argc, char *argv[]) 
 {
-    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    /* Install the signal handler to handle SIGINT and SIGTERM */
     Signal(SIGINT, mysighandler);
     Signal(SIGTERM, mysighandler);
 
