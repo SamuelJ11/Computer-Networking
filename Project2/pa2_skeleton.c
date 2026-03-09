@@ -27,7 +27,7 @@ static void DieWithError(char *errorMessage)
     exit(1); 
 }  
 
-int SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
+void SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
 
 /* This structure is used to store per-thread data in the client */
 typedef struct {
