@@ -50,10 +50,10 @@ void *client_thread_func(void *arg)
 
     /* Zero out timeout metrics, set initial timeout interval to 1 second (1000000 µs) */
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
-    packetdata.alpha = 0.125;
-    packetdata.beta = 0.25;
-    packetdata.EstimatedRTT = 10000;
-    packetdata.TimeoutInterval = 1000000;
+    packetdata.alpha = 0.125; /* textbook value */
+    packetdata.beta = 0.25; /* textbook value */
+    packetdata.EstimatedRTT = 100; /* time in ms */
+    packetdata.TimeoutInterval = 1000; /* time in ms */
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
@@ -68,7 +68,7 @@ void *client_thread_func(void *arg)
     ev.events = EPOLLIN;
     ev.data.fd = data->client_fd;
 
-    /* Register the connected socket from the interest list using epoll_ctl() */
+    /* Register the socket from the interest list using epoll_ctl() */
     if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
     {
         DieWithError("failed to register client's connection socket to the interest list");
@@ -90,19 +90,21 @@ void *client_thread_func(void *arg)
         /* Use gettimeofday() to start the per-packet timer */
         gettimeofday(&start, NULL);
 
+        /* Send the message using sendto(), which includes destination arguments */
         if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
         {
             DieWithError("sendto() sent a different number of bytes than expected");
         }
 
         /* Update the timout interval for epoll for each request */
-        int timeout_ms = packetdata.TimeoutInterval;
+        int timeout_ms = packetdata.TimeoutInterval;  /* will initially be 1 second (1000 ms) */
         
         /* Wait until a packet arrives on the socket OR until the timeout expires */
         int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);
 
-        if (nfds > 0) /* No time out */
+        if (nfds > 0) /* no time out */
         {
+            /* Recieve the data using recvfrom() which includes source arguments */
             recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
             gettimeofday(&end, NULL);
 
@@ -113,17 +115,18 @@ void *client_thread_func(void *arg)
             /* Recalculate the timeout interval using the TimeInterval() function */
             TimeInterval(&packetdata, &starttime, &endtime);  
 
+            /* Update both send and recieve counts */
             data->tx_count ++;
             data->rx_count ++;
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
-            data->tx_count++;
-            packetdata.TimeoutInterval *= 2;  /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+            data->tx_count++; /* only update the sent count */
+            packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
         }
-        else
+        else /* nfds < 0 */
         {
-             DieWithError("epoll_wait() failed");
+            DieWithError("epoll_wait() failed");
         }
     }
 
@@ -184,14 +187,14 @@ void run_server()
     int recvMsgSize; /* Size of received message */ 
     int sentMsgSize; /* Size of echoed message */
 
-    /* Create socket for incoming connections */ 
+    /* Intitialize a file descriptor that will become the UDP server socket */  
     int UDPSock; 
 
     /* Initialize the event struct for the server*/
     struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN; /* The server is listening for read operation */
 
-
+    /* Create socket for incoming connections */
     if ((UDPSock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
     {
         DieWithError("socket() failed");
@@ -245,7 +248,7 @@ void run_server()
             if (sentMsgSize != recvMsgSize) 
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
-            }
+            } 
         }
 
         if (recvMsgSize < 0 && errno != EAGAIN)
