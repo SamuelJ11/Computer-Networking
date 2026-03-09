@@ -13,7 +13,7 @@
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 10000
+#define NUM_REQUESTS 1000000
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
@@ -92,32 +92,39 @@ void *client_thread_func(void *arg)
     and measures the round-trip time (RTT) of this request-response */
     for (int i = 0; i < num_requests; i++) 
     {
-        /* Use gettimeofday() to "start the timer" for the client's sent messsage */
-        gettimeofday(&start, NULL);
+        if (!stop)
+        {
+            /* Use gettimeofday() to "start the timer" for the client's sent messsage */
+            gettimeofday(&start, NULL);
 
-        if (send(data->client_fd, send_buf, MESSAGE_SIZE, 0) != MESSAGE_SIZE)
-        {
-            DieWithError("send() sent a different number of bytes than expected");
-        }            
-        /* Use epoll_wait() to wait for a response from the server */
-        if (epoll_wait(data->epoll_fd, events, MAX_EVENTS, -1) < 0)
-        {
-            DieWithError("epoll_wait() failed");
+            if (send(data->client_fd, send_buf, MESSAGE_SIZE, 0) != MESSAGE_SIZE)
+            {
+                DieWithError("send() sent a different number of bytes than expected");
+            }            
+            /* Use epoll_wait() to wait for a response from the server */
+            if (epoll_wait(data->epoll_fd, events, MAX_EVENTS, -1) < 0)
+            {
+                DieWithError("epoll_wait() failed");
+            }
+            /* Wait (block) until the message is recieved from the server before sending another message */
+            if ((recv(data->client_fd, recv_buf, MESSAGE_SIZE, 0)) < 0)
+            {
+                DieWithError("recv() failed or connection closed prematurely");
+            } 
+            
+            /* Use gettimeofday() to "stop the timer" and record the RTT time */
+            gettimeofday(&end, NULL);
+
+            /* Calculate the total number of microsends that have elapsed */
+            long singleRTT = 0;
+            singleRTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
+            data->total_rtt += singleRTT;
+            data->total_messages += 1; 
         }
-        /* Wait (block) until the message is recieved from the server before sending another message */
-        if ((recv(data->client_fd, recv_buf, MESSAGE_SIZE, 0)) < 0)
+        else
         {
-            DieWithError("recv() failed or connection closed prematurely");
-        } 
-        
-        /* Use gettimeofday() to "stop the timer" and record the RTT time */
-        gettimeofday(&end, NULL);
-
-        /* Calculate the total number of microsends that have elapsed */
-        long singleRTT = 0;
-        singleRTT = (end.tv_sec - start.tv_sec)*1000000 + (end.tv_usec - start.tv_usec);
-        data->total_rtt += singleRTT;
-        data->total_messages += 1; 
+            break; /* if stop is set to 1, break out of the loop and end the thread */
+        }
     }
 
     return NULL;
@@ -130,6 +137,8 @@ void run_client()
     pthread_t threads[num_client_threads];
     client_thread_data_t thread_data[num_client_threads];
 
+    int num_threads_created = 0; /* keep track of the number of threads successfully created */
+
     /* Initialize server address struct in the client */
     struct sockaddr_in ServAddr;  
     memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
@@ -141,13 +150,18 @@ void run_client()
     and connect these sockets of client threads to the server */    
     for (int i = 0; i < num_client_threads; i++)
     {
+        if (stop)
+        {
+            break; /* if stop is set to 1, break out of the loop and end the thread creation process */
+        }
+
         /* Create a reliable, stream socket using TCP */ 
         if ((thread_data[i].client_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         {
             DieWithError("socket() failed");
         }              
         /* Establish the connection to the echo server */ 
-        if (connect(thread_data[i].client_fd, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0)
+        if (connect(thread_data[i].client_fd, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0 && errno != EINTR)
         {
             DieWithError("connect() failed"); 
         } 
@@ -159,6 +173,8 @@ void run_client()
         }
         /* Pass the thread_data to pthread_create() */   
         pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
+
+        num_threads_created++;
     }
 
     /* Initialize acummulators total_rtt and total_messages for the thread loop */
@@ -167,7 +183,7 @@ void run_client()
     
     /* Wait for client threads to complete and aggregate metrics of all client threads */
     puts("==============================================================");
-    for (int i = 0; i < num_client_threads; i++) 
+    for (int i = 0; i < num_threads_created; i++) 
     {
         pthread_join(threads[i], NULL);
         /* initialize per-thread data*/       
@@ -194,6 +210,17 @@ void run_client()
     printf("Average RTT For All Threads: %.2f µs\n", average_rtt);
     printf("Average Request Rate For All Threads: %.2f Messages/s\n", average_request_rate);
     puts("==============================================================");
+
+    /* Close all client sockets */
+    puts("Client is shutting down, closing all thread sockets ...");
+    for (int i = 0; i < num_threads_created; i++)
+    {
+        if (thread_data[i].client_fd > 0) /* socket is open */
+        {
+            close(thread_data[i].client_fd); /* close it */
+            close(thread_data[i].epoll_fd); /* close the epoll instance */
+        }    
+    }
 }
 
 void run_server() 
@@ -205,9 +232,6 @@ void run_server()
     /* Create socket for incoming connections */ 
     int listenSock; /* Socket descriptor for server */ 
     int connSock; /* Socket descriptor for client */
-
-    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
-    Signal(SIGINT, mysighandler);
 
     /* Initialize the event struct for the server*/
     struct epoll_event ev, events[MAX_EVENTS];
@@ -302,6 +326,10 @@ void run_server()
 
 int main(int argc, char *argv[]) 
 {
+    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    Signal(SIGINT, mysighandler);
+    Signal(SIGTERM, mysighandler);
+
     if (argc > 1 && strcmp(argv[1], "server") == 0) 
     {
         if (argc > 2) server_ip = argv[2];

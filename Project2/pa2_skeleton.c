@@ -112,46 +112,53 @@ void *client_thread_func(void *arg)
     /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
     for (int i = 0; i < num_requests; i++) 
     {
-        /* Use gettimeofday() to start the per-packet timer */
-        gettimeofday(&start, NULL);
-
-        /* Send the message using sendto(), which includes destination arguments */
-        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+        if (!stop)
         {
-            DieWithError("sendto() sent a different number of bytes than expected");
-        }
+            /* Use gettimeofday() to start the per-packet timer */
+            gettimeofday(&start, NULL);
 
-        /* Update the timout interval for epoll for each request */
-        int timeout_ms = packetdata.TimeoutInterval;  /* will initially be 1 second (1000 ms) */
+            /* Send the message using sendto(), which includes destination arguments */
+            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+            {
+                DieWithError("sendto() sent a different number of bytes than expected");
+            }
+
+            /* Update the timout interval for epoll for each request */
+            int timeout_ms = packetdata.TimeoutInterval;  /* will initially be 1 second (1000 ms) */
+            
+            /* Wait until a packet arrives on the socket OR until the timeout expires */
+            int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);            
         
-        /* Wait until a packet arrives on the socket OR until the timeout expires */
-        int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);
+            if (nfds > 0) /* no time out */
+            {
+                /* Recieve the data using recvfrom() which includes source arguments */
+                recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
+                gettimeofday(&end, NULL);
 
-        if (nfds > 0) /* no time out */
-        {
-            /* Recieve the data using recvfrom() which includes source arguments */
-            recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
-            gettimeofday(&end, NULL);
+                /* Extract the start and end times to pass to TimeInterval() function */
+                starttime = start.tv_sec*(1000) + (start.tv_usec / 1000);
+                endtime = end.tv_sec*(1000) + (end.tv_usec / 1000);
 
-            /* Extract the start and end times to pass to TimeInterval() function */
-            starttime = start.tv_sec*(1000) + (start.tv_usec / 1000);
-            endtime = end.tv_sec*(1000) + (end.tv_usec / 1000);
+                /* Recalculate the timeout interval using the TimeInterval() function */
+                TimeInterval(&packetdata, &starttime, &endtime);  
 
-            /* Recalculate the timeout interval using the TimeInterval() function */
-            TimeInterval(&packetdata, &starttime, &endtime);  
-
-            /* Update both send and recieve counts */
-            data->tx_count ++;
-            data->rx_count ++;
+                /* Update both send and recieve counts */
+                data->tx_count ++;
+                data->rx_count ++;
+            }
+            else if (nfds == 0) /* timeout (packet loss) */
+            {
+                data->tx_count++; /* only update the sent count */
+                packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+            }
+            else /* nfds < 0 */
+            {
+                DieWithError("epoll_wait() failed");
+            }
         }
-        else if (nfds == 0) /* timeout (packet loss) */
+        else
         {
-            data->tx_count++; /* only update the sent count */
-            packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
-        }
-        else /* nfds < 0 */
-        {
-            DieWithError("epoll_wait() failed");
+            break; /* if stop is set to 1, break out of the loop and end the thread */
         }
     }
 
@@ -165,10 +172,17 @@ void run_client()
     pthread_t threads[num_client_threads];
     client_thread_data_t thread_data[num_client_threads];
 
+    int num_threads_created = 0; /* keep track of the number of threads successfully created */
+
     /* Create sockets and epoll instances for client threads
-    and connect these sockets of client threads to the server */    
+    and connect these sockets of client threads to the server */
     for (int i = 0; i < num_client_threads; i++)
     {
+        if (stop)
+        {
+            break; /* if stop is set to 1, break out of the loop and end the thread creation process */
+        }
+
         /* Create an unreliable, UDP datagram socket using UDP */ 
         if ((thread_data[i].client_fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         {
@@ -183,11 +197,13 @@ void run_client()
         }
         /* Pass the thread_data to pthread_create() */   
         pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
+
+        num_threads_created++;
     }
 
     /* Wait for client threads to complete and aggregate metrics of all client threads */
     puts("==============================================================");
-    for (int i = 0; i < num_client_threads; i++) 
+    for (int i = 0; i < num_threads_created; i++) 
     {
         pthread_join(threads[i], NULL);
         /* initialize per-thread data*/       
@@ -201,6 +217,17 @@ void run_client()
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
         puts("==============================================================");
     }
+    
+    /* Close all client sockets */
+    puts("Client is shutting down, closing all thread sockets ...");
+    for (int i = 0; i < num_threads_created; i++)
+    {
+        if (thread_data[i].client_fd > 0) /* socket is open */
+        {
+            close(thread_data[i].client_fd); /* close it */
+            close(thread_data[i].epoll_fd); /* close the epoll instance */
+        }    
+    }
 }
 
 void run_server() 
@@ -211,9 +238,6 @@ void run_server()
     char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
     int recvMsgSize; /* Size of received message */ 
     int sentMsgSize; /* Size of echoed message */
-
-    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
-    Signal(SIGINT, mysighandler);
 
     /* Intitialize a file descriptor that will become the UDP server socket */  
     int UDPSock; 
@@ -286,12 +310,15 @@ void run_server()
     }
 
     puts("Server is shutting down, closing UDP listening socket ...");
-    epoll_ctl(server_fd, EPOLL_CTL_DEL, UDPSock, NULL); /* remove the server's UDP socket from the interest list */
     close(UDPSock);
 }
 
 int main(int argc, char *argv[]) 
 {
+    /* Install the signal handler to handle SIGINT to handle gracefull server shutdown */
+    Signal(SIGINT, mysighandler);
+    Signal(SIGTERM, mysighandler);
+
     if (argc > 1 && strcmp(argv[1], "server") == 0) 
     {
         if (argc > 2) server_ip = argv[2];
