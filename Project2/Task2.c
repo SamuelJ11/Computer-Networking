@@ -84,7 +84,7 @@ void *client_thread_func(void *arg)
     packetdata.TimeoutInterval.tv_nsec = 100000; /* time in ns */
 
     /* This value will represent timeout of each packet in µs */
-    long timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
+    long timeout_µs = 0;
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
@@ -128,10 +128,12 @@ void *client_thread_func(void *arg)
             DieWithError("sendto() sent a different number of bytes than expected");
         }
 
-        /* Set a minimum timeout of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+        /* Calculate the timeout in microseconds, updates with each iteration */
+        timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
+
+        /* Reset timeout to a minimum of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
         if (timeout_µs < 100)
         {
-            packetdata.TimeoutInterval.tv_sec = 0;
             packetdata.TimeoutInterval.tv_nsec = 100000; 
         }
 
@@ -159,11 +161,15 @@ void *client_thread_func(void *arg)
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
-            data->tx_count++; /* only update the number of sent packets */
+            /* Only update the number of sent packets */
+            data->tx_count++; 
 
             /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
-            packetdata.TimeoutInterval.tv_sec *= 2;
-            packetdata.TimeoutInterval.tv_nsec *= 2;
+            timeout_µs *= 2;
+
+            /* Update the timespec struct that epoll_pwait2() actually uses */
+            packetdata.TimeoutInterval.tv_sec = timeout_µs / 1000000;
+            packetdata.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
         }
         else /* nfds < 0 */
         {
@@ -175,11 +181,6 @@ void *client_thread_func(void *arg)
         {
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
             data->avg_timeout += (timeout_µs);
-            timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000); /* convert to µs for easier comparison */
-
-            /* TESTING PURPOSES ONLY! DELETE WHEN DEBUGGED */
-            printf("Timeout (s): %ld, Timeout (µs): %ld, Timeout in ns: %ld\n", 
-            packetdata.TimeoutInterval.tv_sec, timeout_µs, packetdata.TimeoutInterval.tv_nsec);
         }
 
         i++;
