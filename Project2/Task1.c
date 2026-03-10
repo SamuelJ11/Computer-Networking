@@ -137,7 +137,7 @@ void *client_thread_func(void *arg)
             packetdata.TimeoutInterval.tv_nsec = 100000; 
         }
 
-        if (timeout_µs > 1000000) /* If timeout exceeds 1 second, something has gone seriously wrong */
+        if (timeout_µs > 1000000) /* if timeout exceeds 1 second, something has gone seriously wrong */
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
@@ -271,12 +271,12 @@ void run_client()
 
 void run_server() 
 {
-    struct sockaddr_in ServAddr; /* Local address of server */ 
-    struct sockaddr_in ClntAddr; /* Client address */     
-    unsigned int clntLen; /* Length of client address data structure */
+    struct sockaddr_in ServAddr; /* local address of server */ 
+    struct sockaddr_in ClntAddr; /* client address */     
+    unsigned int clntLen; /* length of client address data structure */
     char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
-    int recvMsgSize; /* Size of received message */ 
-    int sentMsgSize; /* Size of echoed message */
+    int recvMsgSize; /* size of received message */ 
+    int sentMsgSize; /* size of echoed message */
 
     /* Intitialize a file descriptor that will become the UDP server socket */  
     int UDPSock; 
@@ -295,10 +295,10 @@ void run_server()
     ev.data.fd = UDPSock;
     
     /* Construct local address structure */ 
-    memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
-    ServAddr.sin_family = AF_INET; /* Internet address family */ 
-    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    ServAddr.sin_port = htons(server_port); /* Server port */ 
+    memset(&ServAddr, 0, sizeof(ServAddr)); /* zero out structure */
+    ServAddr.sin_family = AF_INET; /* internet address family */ 
+    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* any incoming interface */
+    ServAddr.sin_port = htons(server_port); /* server port */ 
     
     /* Bind the socket to address of the server */ 
     if (bind(UDPSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
@@ -325,7 +325,7 @@ void run_server()
     /* Server's run-to-completion event loop */
     while (!stop) 
     {
-        clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
+        clntLen = sizeof(ClntAddr); /* set the size of the in-out parameter */ 
         
         if (epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0 && errno != EINTR)
         {
@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
     /* Install the signal handler to handle SIGINT */
     Signal(SIGINT, mysighandler);
     
-    /* Initialize the mask used by epoll_pwait2 */
+    /* Initialize the mask used by epoll_pwait2() */
     sigemptyset(&sigmask);
 
     if (argc > 1 && strcmp(argv[1], "server") == 0) 
