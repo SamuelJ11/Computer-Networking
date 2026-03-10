@@ -60,6 +60,7 @@ typedef struct {
     int client_fd;      /* File descriptor for the client socket on which data is sent to the server. */
     long tx_count;       /* Accumulated number of sent packets for each thread */
     long rx_count;       /* Accumulated number of recieved packets for each thread */
+    long long avg_timeout; /* Average timeout interval for each thread (in µs) */
 } client_thread_data_t;
 
 /* This function runs in a separate client thread to handle communication with the server */ 
@@ -72,13 +73,14 @@ void *client_thread_func(void *arg)
     /* Zero out accumulation metrics */
     data->tx_count = 0;
     data->rx_count = 0;
+    data->avg_timeout = 0;
 
     /* Zero out timeout metrics, set initial timeout interval to 1 second (1000000 µs) */
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
     packetdata.alpha = 0.125; /* textbook value */
     packetdata.beta = 0.25; /* textbook value */
-    packetdata.EstimatedRTT = 1000; /* time in µs */
-    packetdata.TimeoutInterval = 10000; /* time in µs */
+    packetdata.EstimatedRTT = 100; /* time in µs */
+    packetdata.TimeoutInterval = 1000; /* time in µs */
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
@@ -123,8 +125,14 @@ void *client_thread_func(void *arg)
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
 
-            /* Update the timout interval for epoll for each request */
-            int timeout_ms = packetdata.TimeoutInterval;  /* will initially be 1 second (1000 ms) */
+            /* The timeout field of epoll is in milliseconds, so we must convert out timeout from µs to ms */
+            int timeout_ms = packetdata.TimeoutInterval / 1000;  /* will initially be 1ms */
+
+            /* Set a minimum timeout of 1ms to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+            if (timeout_ms < 1)
+            {
+                timeout_ms = 1; 
+            }
             
             /* Wait until a packet arrives on the socket OR until the timeout expires */
             int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);            
@@ -145,28 +153,27 @@ void *client_thread_func(void *arg)
                 /* Update both send and recieve counts */
                 data->tx_count ++;
                 data->rx_count ++;
-
-                /* Testing purposes only, delete later*/
-                if (i % (NUM_REQUESTS / 10) == 0) /* print out metrics every 10% of the total number of requests */
-                {
-                    printf("Updated timeout interval for socket %d; timeout now %.2f µs\n", data->client_fd, packetdata.TimeoutInterval);
-                }
             }
             else if (nfds == 0) /* timeout (packet loss) */
             {
-                /* Check if server is still running by ensuring a timout of 5 seconds is not exceeded */
-                if (packetdata.TimeoutInterval > 5000) /* 5 seconds */
-                {
-                    puts("server is not responding: Maximum timeout exceeded");
-                    exit(1);
-                }
-
                 data->tx_count++; /* only update the sent count */
                 packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+
+                /* Check if server is still running by ensuring a timout of 1 second is not exceeded */
+                if (packetdata.TimeoutInterval > 1000000)
+                {
+                    puts("server is overloaded or not responding; maximum timeout exceeded");
+                    exit(1);
+                }
             }
             else /* nfds < 0 */
             {
                 DieWithError("epoll_wait() failed");
+            }
+            /* Update the average timeout for every 10% of messages sent */
+            if (i % (NUM_REQUESTS / 10) == 0)
+            {
+                data->avg_timeout += packetdata.TimeoutInterval; 
             }
         }
         else
@@ -186,6 +193,8 @@ void run_client()
     client_thread_data_t thread_data[num_client_threads];
 
     int num_threads_created = 0; /* keep track of the number of threads successfully created */
+    long total_packets_dropped = 0; /* accumulate the total number of dropped packets for each thread */
+    long average_timeout = 0; /* accumulate the average timeout for each thread to compute an overall average timeout across all threads */
 
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */
@@ -219,10 +228,15 @@ void run_client()
     for (int i = 0; i < num_threads_created; i++) 
     {
         pthread_join(threads[i], NULL);
-        /* initialize per-thread data*/       
+
+        /* Initialize per-thread data */       
         long thread_tx_cnt = thread_data[i].tx_count;
         long thread_rx_cnt = thread_data[i].rx_count;
         long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
+
+        /* Update accumulators */
+        total_packets_dropped += thread_lost_pkt_cnt;
+        average_timeout += thread_data[i].avg_timeout / 10; 
         
         printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
@@ -230,6 +244,15 @@ void run_client()
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
         puts("==============================================================");
     }
+
+    /* Wait for client threads to complete and aggregate metrics of all client threads */
+    float loss_proportion = (float)total_packets_dropped / (float)(NUM_REQUESTS * num_client_threads);
+
+    puts("==============================================================");
+    printf("Summary Statistics: Finished Processing %d Total Requests \n\n", NUM_REQUESTS * num_threads_created);
+    printf("Average Packet Loss Rate Across All Threads: %.2f %%\n", loss_proportion*100);
+    printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+    puts("==============================================================");
     
     /* Close all client sockets */
     puts("client is shutting down, closing all thread sockets ...");
@@ -322,7 +345,7 @@ void run_server()
         }                
     }
 
-    puts("server is shutting down, closing UDP listening socket ...");
+    puts("\ninterrupt signal recieved; shutting down server and closing UDP listening socket ...");
     close(UDPSock);
 }
 
