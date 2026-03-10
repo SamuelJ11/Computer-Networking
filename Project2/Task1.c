@@ -80,11 +80,11 @@ void *client_thread_func(void *arg)
     packetdata.alpha = 0.125; /* textbook value */
     packetdata.beta = 0.25; /* textbook value */
     packetdata.EstimatedRTT = 10; /* time in µs */
-    packetdata.TimeoutInterval.tv_sec = 0.0001; /* time in s */
+    packetdata.TimeoutInterval.tv_sec = 0; /* time in s (this value will pretty much always be zero) */
     packetdata.TimeoutInterval.tv_nsec = 100000; /* time in ns */
 
     /* This value will represent timeout of each packet in µs */
-    long timeout_µs = 0; 
+    long timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
@@ -115,76 +115,74 @@ void *client_thread_func(void *arg)
     socklen_t fromLen = sizeof(fromAddr);
 
     /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
-    for (int i = 0; i < num_requests; i++) 
+    int i = 0;
+    while (i < num_requests && !stop) 
     {
-        if (!stop)
+        /* Use clock_gettime() to start the per-packet timer as it provides nanosecond precision */
+        /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
+        clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
+
+        /* Send the message using sendto(), which includes destination arguments */
+        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
         {
-            /* Use clock_gettime() to start the per-packet timer as it provides nanosecond precision */
-            /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
-            clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
+            DieWithError("sendto() sent a different number of bytes than expected");
+        }
 
-            /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
-            {
-                DieWithError("sendto() sent a different number of bytes than expected");
-            }
+        /* Set a minimum timeout of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+        if (timeout_µs < 100)
+        {
+            packetdata.TimeoutInterval.tv_sec = 0;
+            packetdata.TimeoutInterval.tv_nsec = 100000; 
+        }
 
-            /* Recalculate (update) the timeout value for each packet sent */
+        if (timeout_µs > 1000000) /* If timeout exceeds 1 second, something has gone seriously wrong */
+        {
+            puts("server is overloaded or not responding; maximum timeout exceeded");
+            exit(1);
+        }
+
+        /* Wait until a packet arrives on the socket OR until the timeout expires */
+        int nfds = epoll_pwait2(data->epoll_fd, events, MAX_EVENTS, &packetdata.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
+    
+        if (nfds > 0) /* no time out */
+        {
+            /* Recieve the data using recvfrom() which includes source arguments */
+            recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
+            clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
+
+            /* Recalculate the timeout interval using the TimeInterval() function */
+            TimeInterval(&packetdata);  
+
+            /* Update both send and recieve counts */
+            data->tx_count ++;
+            data->rx_count ++;  
+        }
+        else if (nfds == 0) /* timeout (packet loss) */
+        {
+            data->tx_count++; /* only update the number of sent packets */
+
+            /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+            packetdata.TimeoutInterval.tv_sec *= 2;
+            packetdata.TimeoutInterval.tv_nsec *= 2;
+        }
+        else /* nfds < 0 */
+        {
+            DieWithError("epoll_pwait2() failed");
+        }
+
+        /* Update the average timeout for every 10% of messages sent */
+        if (i % (NUM_REQUESTS / 10) == 0)
+        {
+            /* Add microsecond timeout values for the accumulation metrics in runclient() */
+            data->avg_timeout += (timeout_µs);
             timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000); /* convert to µs for easier comparison */
 
-            /* Set a minimum timeout of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
-            if (timeout_µs < 100)
-            {
-                packetdata.TimeoutInterval.tv_sec = 0.0001;
-                packetdata.TimeoutInterval.tv_nsec = 100000; 
-            }
-
-            if (timeout_µs > 1000000) /* If timeout exceeds 1 second, something has gone seriously wrong */
-            {
-                puts("server is overloaded or not responding; maximum timeout exceeded");
-                exit(1);
-            }
-            
-            /* Wait until a packet arrives on the socket OR until the timeout expires */
-            int nfds = epoll_pwait2(data->epoll_fd, events, MAX_EVENTS, &packetdata.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
-        
-            if (nfds > 0) /* no time out */
-            {
-                /* Recieve the data using recvfrom() which includes source arguments */
-                recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
-                clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
-
-                /* Recalculate the timeout interval using the TimeInterval() function */
-                TimeInterval(&packetdata);  
-
-                /* Update both send and recieve counts */
-                data->tx_count ++;
-                data->rx_count ++;  
-            }
-            else if (nfds == 0) /* timeout (packet loss) */
-            {
-                data->tx_count++; /* only update the number of sent packets */
-
-                /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
-                packetdata.TimeoutInterval.tv_sec *= 2;
-                packetdata.TimeoutInterval.tv_nsec *= 2;
-            }
-            else /* nfds < 0 */
-            {
-                DieWithError("epoll_wait() failed");
-            }
-
-            /* Update the average timeout for every 10% of messages sent */
-            if (i % (NUM_REQUESTS / 10) == 0)
-            {
-                /* Add microsecond timeout values for the accumulation metrics in runclient() */
-                data->avg_timeout += (timeout_µs);
-            }
+            /* TESTING PURPOSES ONLY! DELETE WHEN DEBUGGED */
+            printf("Timeout (s): %ld, Timeout (µs): %ld, Timeout in ns: %ld\n", 
+            packetdata.TimeoutInterval.tv_sec, timeout_µs, packetdata.TimeoutInterval.tv_nsec);
         }
-        else
-        {
-            break; /* if stop is set to 1, break out of the loop and end the thread */
-        }
+
+        i++;
     }
 
     return NULL;
@@ -204,13 +202,9 @@ void run_client()
 
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */
-    for (int i = 0; i < num_client_threads; i++)
+    int i = 0;
+    while (i < num_client_threads && !stop)
     {
-        if (stop)
-        {
-            break; /* if stop is set to 1, break out of the loop and end the thread creation process */
-        }
-
         /* Create an unreliable, UDP datagram socket using UDP */ 
         if ((thread_data[i].client_fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         {
@@ -227,6 +221,7 @@ void run_client()
         pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
 
         num_threads_created++;
+        i++;
     }
 
     /* Wait for client threads to complete and aggregate metrics of all client threads */
