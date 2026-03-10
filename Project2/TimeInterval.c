@@ -16,7 +16,10 @@ void TimeInterval(calcTimeIntval *packetdata)
     /* We calculate DevRTT be an estimate of how much Sample RTT typically deviates from EstimatedRTT */
     packetdata->DevRTT = (1 - packetdata->beta)* packetdata->DevRTT + packetdata->beta*fabs(packetdata->SampleRTT - packetdata->EstimatedRTT);
 
+    /* Compute the round trip time in microsends before populating the timespec struct*/
+    long rt0_µs = packetdata->EstimatedRTT + 4*(packetdata->DevRTT); /* time in µs */
+    
     /* Finally, obtain use the formula for retransmission timeout interval as a function of EstimatedRTT and DevRTT */
-    packetdata->TimeoutInterval.tv_sec = (packetdata->EstimatedRTT + 4*(packetdata->DevRTT)) / 1000000; /* convert µs to s */
-    packetdata->TimeoutInterval.tv_nsec = (packetdata->EstimatedRTT + 4*(packetdata->DevRTT)) * 1000; /* convert µs to ns */
+    packetdata->TimeoutInterval.tv_sec = rt0_µs  / 1000000; /* convert µs to s */
+    packetdata->TimeoutInterval.tv_nsec = (rt0_µs % 1000000) * 1000; /* convert µs to ns safely without overflowing */
 }
