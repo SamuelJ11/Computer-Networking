@@ -23,6 +23,7 @@ int num_client_threads = DEFAULT_CLIENT_THREADS;
 int num_requests = NUM_REQUESTS;
 
 volatile sig_atomic_t stop = 0; /* used for the signal handler we install later */
+sigset_t sigmask; /* used for the signal mask in epoll_pwait2 */
 
 /* Create a type alias named sighandler_t to simplify call to Signal() */
 typedef void (*sighandler_t)(int);
@@ -68,25 +69,27 @@ void *client_thread_func(void *arg)
 {
     client_thread_data_t *data = (client_thread_data_t *)arg; /* initialize client_thread_data_t struct within the thread */
     calcTimeIntval packetdata; /* initialize calcTimeIntval struct */
-    long long starttime = 0, endtime = 0; /* used for passing start and endtimes to TimeInterval function */
-   
+    
     /* Zero out accumulation metrics */
     data->tx_count = 0;
     data->rx_count = 0;
     data->avg_timeout = 0;
 
-    /* Zero out timeout metrics, set initial timeout interval to 1 second (1000000 µs) */
-    memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure */
+    /* Zero out timeout metrics, set initial timeout interval to 200 microseconds (µs) */
+    memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure before initializing */
     packetdata.alpha = 0.125; /* textbook value */
     packetdata.beta = 0.25; /* textbook value */
-    packetdata.EstimatedRTT = 100; /* time in µs */
-    packetdata.TimeoutInterval = 1000; /* time in µs */
+    packetdata.EstimatedRTT = 10; /* time in µs */
+    packetdata.TimeoutInterval.tv_sec = 0.0001; /* time in s */
+    packetdata.TimeoutInterval.tv_nsec = 100000; /* time in ns */
+
+    /* This value will represent timeout of each packet in µs */
+    long timeout_µs = 0; 
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
     char recv_buf[MESSAGE_SIZE];
-    struct timeval start, end;
 
     /* Set client_fd to non-blocking when epoll starts watching it*/
     SetNonBlocking(data->client_fd);
@@ -116,8 +119,9 @@ void *client_thread_func(void *arg)
     {
         if (!stop)
         {
-            /* Use gettimeofday() to start the per-packet timer */
-            gettimeofday(&start, NULL);
+            /* Use clock_gettime() to start the per-packet timer as it provides nanosecond precision */
+            /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
+            clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
 
             /* Send the message using sendto(), which includes destination arguments */
             if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
@@ -125,55 +129,56 @@ void *client_thread_func(void *arg)
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
 
-            /* The timeout field of epoll is in milliseconds, so we must convert out timeout from µs to ms */
-            int timeout_ms = packetdata.TimeoutInterval / 1000;  /* will initially be 1ms */
+            /* Recalculate (update) the timeout value for each packet sent */
+            timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000); /* convert to µs for easier comparison */
 
-            /* Set a minimum timeout of 1ms to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
-            if (timeout_ms < 1)
+            /* Set a minimum timeout of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+            if (timeout_µs < 100)
             {
-                timeout_ms = 1; 
+                packetdata.TimeoutInterval.tv_sec = 0.0001;
+                packetdata.TimeoutInterval.tv_nsec = 100000; 
+            }
+
+            if (timeout_µs > 1000000) /* If timeout exceeds 1 second, something has gone seriously wrong */
+            {
+                puts("server is overloaded or not responding; maximum timeout exceeded");
+                exit(1);
             }
             
             /* Wait until a packet arrives on the socket OR until the timeout expires */
-            int nfds = epoll_wait(data->epoll_fd, events, MAX_EVENTS, timeout_ms);            
+            int nfds = epoll_pwait2(data->epoll_fd, events, MAX_EVENTS, &packetdata.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
         
             if (nfds > 0) /* no time out */
             {
                 /* Recieve the data using recvfrom() which includes source arguments */
                 recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
-                gettimeofday(&end, NULL);
-
-                /* Extract the start and end times (in µs)to pass to TimeInterval() function */
-                starttime = start.tv_sec*(1000000) + (start.tv_usec);
-                endtime = end.tv_sec*(1000000) + (end.tv_usec);
+                clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
 
                 /* Recalculate the timeout interval using the TimeInterval() function */
-                TimeInterval(&packetdata, &starttime, &endtime);  
+                TimeInterval(&packetdata);  
 
                 /* Update both send and recieve counts */
                 data->tx_count ++;
-                data->rx_count ++;
+                data->rx_count ++;  
             }
             else if (nfds == 0) /* timeout (packet loss) */
             {
-                data->tx_count++; /* only update the sent count */
-                packetdata.TimeoutInterval *= 2; /* double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+                data->tx_count++; /* only update the number of sent packets */
 
-                /* Check if server is still running by ensuring a timout of 1 second is not exceeded */
-                if (packetdata.TimeoutInterval > 1000000)
-                {
-                    puts("server is overloaded or not responding; maximum timeout exceeded");
-                    exit(1);
-                }
+                /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+                packetdata.TimeoutInterval.tv_sec *= 2;
+                packetdata.TimeoutInterval.tv_nsec *= 2;
             }
             else /* nfds < 0 */
             {
                 DieWithError("epoll_wait() failed");
             }
+
             /* Update the average timeout for every 10% of messages sent */
             if (i % (NUM_REQUESTS / 10) == 0)
             {
-                data->avg_timeout += packetdata.TimeoutInterval; 
+                /* Add microsecond timeout values for the accumulation metrics in runclient() */
+                data->avg_timeout += (timeout_µs);
             }
         }
         else
@@ -193,6 +198,7 @@ void run_client()
     client_thread_data_t thread_data[num_client_threads];
 
     int num_threads_created = 0; /* keep track of the number of threads successfully created */
+    long total_packets_sent = 0; /* accumulate the total number of sent packets for each thread */
     long total_packets_dropped = 0; /* accumulate the total number of dropped packets for each thread */
     long average_timeout = 0; /* accumulate the average timeout for each thread to compute an overall average timeout across all threads */
 
@@ -235,6 +241,7 @@ void run_client()
         long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
 
         /* Update accumulators */
+        total_packets_sent += thread_tx_cnt;
         total_packets_dropped += thread_lost_pkt_cnt;
         average_timeout += thread_data[i].avg_timeout / 10; 
         
@@ -246,10 +253,10 @@ void run_client()
     }
 
     /* Wait for client threads to complete and aggregate metrics of all client threads */
-    float loss_proportion = (float)total_packets_dropped / (float)(NUM_REQUESTS * num_client_threads);
+    float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
 
     puts("==============================================================");
-    printf("Summary Statistics: Finished Processing %d Total Requests \n\n", NUM_REQUESTS * num_threads_created);
+    printf("Summary Statistics: Finished Processing %ld Total Requests \n\n", total_packets_sent);
     printf("Average Packet Loss Rate Across All Threads: %.2f %%\n", loss_proportion*100);
     printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
     puts("==============================================================");
@@ -351,9 +358,11 @@ void run_server()
 
 int main(int argc, char *argv[]) 
 {
-    /* Install the signal handler to handle SIGINT and SIGTERM */
+    /* Install the signal handler to handle SIGINT */
     Signal(SIGINT, mysighandler);
-    Signal(SIGTERM, mysighandler);
+    
+    /* Initialize the mask used by epoll_pwait2 */
+    sigemptyset(&sigmask);
 
     if (argc > 1 && strcmp(argv[1], "server") == 0) 
     {
