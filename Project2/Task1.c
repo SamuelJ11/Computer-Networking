@@ -42,12 +42,12 @@ static void DieWithError(char *errorMessage)
     exit(1); 
 }  
 
-/* Implement a wrapper function called Signal() that handles the unwiedly sigaction() function call */
+/* Implement a wrapper function called Signal() that handles the unwieldy sigaction() function call */
 void Signal(int signum, sighandler_t handler)
 {
     struct sigaction new_action;
-    new_action.sa_handler = handler;        // assigns the function pointer passed to the wrapper to the handler field
-    sigfillset(&new_action.sa_mask);        // initializes the set to include every possible signal (all bits are 1)
+    new_action.sa_handler = handler; /* assigns the function pointer passed to the wrapper to the handler field */
+    sigfillset(&new_action.sa_mask); /* initializes the set to include every possible signal (all bits are 1) */
 
     if (sigaction(signum, &new_action, NULL) < 0)
     {
@@ -55,7 +55,7 @@ void Signal(int signum, sighandler_t handler)
     }
 }
 
-void SetNonBlocking(int fd); /* Function for setting non-blocking flags for file descriptors */
+void SetNonBlocking(int fd); /* function for setting non-blocking flags for file descriptors */
 
 /* This structure is used to store per-thread data in the client */
 typedef struct {
