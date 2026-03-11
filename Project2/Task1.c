@@ -142,7 +142,8 @@ void *client_thread_func(void *arg)
             packetdata.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
 
-        if (timeout_µs > 100000) /* if timeout exceeds 1 second, something has gone seriously wrong */
+        /* If timeout exceeds 1 second, something has gone seriously wrong */
+        if (timeout_µs > 1000000) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
@@ -187,8 +188,6 @@ void *client_thread_func(void *arg)
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
             data->avg_timeout += (timeout_µs);
             data->progress += 1; /* update the number of 10% increments completed */
-
-            printf("Thread timeout: %ld µs\nProgress: %d%%\n", timeout_µs, data->progress * 10);
         }
 
         i++;
@@ -247,7 +246,12 @@ void run_client()
         /* Update accumulators */
         total_packets_sent += thread_tx_cnt;
         total_packets_dropped += thread_lost_pkt_cnt;
-        average_timeout += thread_data[i].avg_timeout / thread_data[i].progress;
+
+        /* Add guard against floating point exception (division by zero) */
+        if (thread_data[i].progress > 0) /* only update average timeout if the thread has sent at least 10% of its messages */
+        {
+            average_timeout += thread_data[i].avg_timeout / thread_data[i].progress;
+        }
         
         printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
@@ -256,13 +260,22 @@ void run_client()
         puts("==============================================================");
     }
 
-    /* Wait for client threads to complete and aggregate metrics of all client threads */
-    float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
-
     puts("==============================================================");
     printf("Summary Statistics: Finished Processing %ld Total Requests \n\n", total_packets_sent);
+
+    /* Calculate the loss proportion across all threads */
+    float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
     printf("Average Packet Loss Rate Across All Threads: %.4f %%\n", loss_proportion*100);
-    printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+
+    if (average_timeout > 0) /* only print average timeout if all threads have sent at least 10% of their packets */
+    {
+        printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+    }
+    else
+    {
+        puts("Average Timeout Across all Threads: NA");
+    }
+
     puts("==============================================================");
     
     /* Close all client sockets */
@@ -324,6 +337,7 @@ void run_server()
     {
         DieWithError("failed to the created the epoll instance for server");
     } 
+
     /* Register the listening socket to epoll */
     if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
     {
