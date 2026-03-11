@@ -14,7 +14,7 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 4
+#define DEFAULT_CLIENT_THREADS 8
 #define NUM_REQUESTS 1000000
 
 char *server_ip = "127.0.0.1";
@@ -57,11 +57,12 @@ void SetNonBlocking(int fd); /* Function for setting non-blocking flags for file
 
 /* This structure is used to store per-thread data in the client */
 typedef struct {
-    int epoll_fd;       /* File descriptor for the epoll instance, used for monitoring events on the socket. */
-    int client_fd;      /* File descriptor for the client socket on which data is sent to the server. */
-    long tx_count;       /* Accumulated number of sent packets for each thread */
-    long rx_count;       /* Accumulated number of recieved packets for each thread */
-    long long avg_timeout; /* Average timeout interval for each thread (in µs) */
+    int epoll_fd;       /* file descriptor for the epoll instance, used for monitoring events on the socket. */
+    int client_fd;      /* file descriptor for the client socket on which data is sent to the server. */
+    long tx_count;       /* accumulated number of sent packets for each thread */
+    long rx_count;       /* accumulated number of recieved packets for each thread */
+    long avg_timeout; /* average timeout interval for each thread (in µs) */
+    unsigned short progress; /* used for tracking the percent completion of each thread */
 } client_thread_data_t;
 
 /* This function runs in a separate client thread to handle communication with the server */ 
@@ -74,6 +75,7 @@ void *client_thread_func(void *arg)
     data->tx_count = 0;
     data->rx_count = 0;
     data->avg_timeout = 0;
+    data->progress = 0;
 
     /* Zero out timeout metrics, set initial timeout interval to 200 microseconds (µs) */
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure before initializing */
@@ -131,13 +133,17 @@ void *client_thread_func(void *arg)
         /* Calculate the timeout in microseconds, updates with each iteration */
         timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
 
-        /* Reset timeout to a minimum of 100 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
-        if (timeout_µs < 100)
+        /* Reset timeout to a minimum of 10 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+        if (timeout_µs < 10)
         {
-            packetdata.TimeoutInterval.tv_nsec = 100000; 
+            timeout_µs = 10;
+
+            /* Update the timespec struct that epoll_pwait2() actually uses */
+            packetdata.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
 
-        if (timeout_µs > 1000000) /* If timeout exceeds 1 second, something has gone seriously wrong */
+        /* If timeout exceeds 1 second, something has gone seriously wrong */
+        if (timeout_µs > 1000000) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
@@ -177,10 +183,11 @@ void *client_thread_func(void *arg)
         }
 
         /* Update the average timeout for every 10% of messages sent */
-        if (i % (NUM_REQUESTS / 10) == 0)
+        if (i > 0 && i % (NUM_REQUESTS / 10) == 0)
         {
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
             data->avg_timeout += (timeout_µs);
+            data->progress += 1; /* update the number of 10% increments completed */
         }
 
         i++;
@@ -239,7 +246,12 @@ void run_client()
         /* Update accumulators */
         total_packets_sent += thread_tx_cnt;
         total_packets_dropped += thread_lost_pkt_cnt;
-        average_timeout += thread_data[i].avg_timeout / 10; 
+
+        /* Add guard against floating point exception (division by zero) */
+        if (thread_data[i].progress > 0) /* only update average timeout if the thread has sent at least 10% of its messages */
+        {
+            average_timeout += thread_data[i].avg_timeout / thread_data[i].progress;
+        }
         
         printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
@@ -248,13 +260,22 @@ void run_client()
         puts("==============================================================");
     }
 
-    /* Wait for client threads to complete and aggregate metrics of all client threads */
-    float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
-
     puts("==============================================================");
     printf("Summary Statistics: Finished Processing %ld Total Requests \n\n", total_packets_sent);
-    printf("Average Packet Loss Rate Across All Threads: %.2f %%\n", loss_proportion*100);
-    printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+
+    /* Calculate the loss proportion across all threads */
+    float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
+    printf("Average Packet Loss Rate Across All Threads: %.4f %%\n", loss_proportion*100);
+
+    if (average_timeout > 0) /* only print average timeout if all threads have sent at least 10% of their packets */
+    {
+        printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+    }
+    else
+    {
+        puts("Average Timeout Across all Threads: NA");
+    }
+
     puts("==============================================================");
     
     /* Close all client sockets */
@@ -271,12 +292,12 @@ void run_client()
 
 void run_server() 
 {
-    struct sockaddr_in ServAddr; /* Local address of server */ 
-    struct sockaddr_in ClntAddr; /* Client address */     
-    unsigned int clntLen; /* Length of client address data structure */
+    struct sockaddr_in ServAddr; /* local address of server */ 
+    struct sockaddr_in ClntAddr; /* client address */     
+    unsigned int clntLen; /* length of client address data structure */
     char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
-    int recvMsgSize; /* Size of received message */ 
-    int sentMsgSize; /* Size of echoed message */
+    int recvMsgSize; /* size of received message */ 
+    int sentMsgSize; /* size of echoed message */
 
     /* Intitialize a file descriptor that will become the UDP server socket */  
     int UDPSock; 
@@ -295,10 +316,10 @@ void run_server()
     ev.data.fd = UDPSock;
     
     /* Construct local address structure */ 
-    memset(&ServAddr, 0, sizeof(ServAddr)); /* Zero out structure */
-    ServAddr.sin_family = AF_INET; /* Internet address family */ 
-    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    ServAddr.sin_port = htons(server_port); /* Server port */ 
+    memset(&ServAddr, 0, sizeof(ServAddr)); /* zero out structure */
+    ServAddr.sin_family = AF_INET; /* internet address family */ 
+    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* any incoming interface */
+    ServAddr.sin_port = htons(server_port); /* server port */ 
     
     /* Bind the socket to address of the server */ 
     if (bind(UDPSock, (struct sockaddr *)&ServAddr, sizeof(ServAddr)) < 0)
@@ -316,6 +337,7 @@ void run_server()
     {
         DieWithError("failed to the created the epoll instance for server");
     } 
+
     /* Register the listening socket to epoll */
     if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
     {
@@ -325,7 +347,7 @@ void run_server()
     /* Server's run-to-completion event loop */
     while (!stop) 
     {
-        clntLen = sizeof(ClntAddr); /* Set the size of the in-out parameter */ 
+        clntLen = sizeof(ClntAddr); /* set the size of the in-out parameter */ 
         
         if (epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0 && errno != EINTR)
         {
@@ -357,7 +379,7 @@ int main(int argc, char *argv[])
     /* Install the signal handler to handle SIGINT */
     Signal(SIGINT, mysighandler);
     
-    /* Initialize the mask used by epoll_pwait2 */
+    /* Initialize the mask used by epoll_pwait2() */
     sigemptyset(&sigmask);
 
     if (argc > 1 && strcmp(argv[1], "server") == 0) 
