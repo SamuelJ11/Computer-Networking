@@ -14,13 +14,15 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 4
+#define DEFAULT_CLIENT_THREADS 8
 #define NUM_REQUESTS 1000000
+#define PIPELINE 8
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
-int num_client_threads = DEFAULT_CLIENT_THREADS;
+int num_threads = DEFAULT_CLIENT_THREADS;
 int num_requests = NUM_REQUESTS;
+int pipeline_size = PIPELINE;
 
 volatile sig_atomic_t stop = 0; /* used for the signal handler we install later */
 sigset_t sigmask; /* used for the signal mask in epoll_pwait2 */
@@ -83,7 +85,7 @@ void *client_thread_func(void *arg)
     packetdata.beta = 0.25; /* textbook value */
     packetdata.EstimatedRTT = 10; /* time in µs */
     packetdata.TimeoutInterval.tv_sec = 0; /* time in s (this value will pretty much always be zero) */
-    packetdata.TimeoutInterval.tv_nsec = 100000; /* time in ns */
+    packetdata.TimeoutInterval.tv_nsec = (10000 * num_threads * pipeline_size); /* time in ns */
 
     /* This value will represent timeout of each packet in µs */
     long timeout_µs = 0;
@@ -120,25 +122,29 @@ void *client_thread_func(void *arg)
     int i = 0;
     while (i < num_requests && !stop) 
     {
-        /* Use clock_gettime() to start the per-packet timer as it provides nanosecond precision */
+        /* Use clock_gettime() to start the per-packet-burst timer as it provides nanosecond precision */
         /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
         clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
 
-        /* Send the message using sendto(), which includes destination arguments */
-        if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+        for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
-            DieWithError("sendto() sent a different number of bytes than expected");
-        }
+            /* Send the message using sendto(), which includes destination arguments */
+            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+            {
+                DieWithError("sendto() sent a different number of bytes than expected");
+            }
 
+            data->tx_count++; /* update the number of sent packets */
+            i++; /* update the number of requests fullfilled */
+        }
         /* Calculate the timeout in microseconds, updates with each iteration */
         timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
 
         /* Reset timeout to a minimum of 10 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
-        if (timeout_µs < 10)
+        if (timeout_µs < (10 * num_threads * pipeline_size))
         {
-            timeout_µs = 10;
-
-            /* Update the timespec struct that epoll_pwait2() actually uses */
+            /* Restore timeout and update the timespec struct that epoll_pwait2() actually uses */
+            timeout_µs = (10 * num_threads * pipeline_size);
             packetdata.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
 
@@ -154,22 +160,20 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-            /* Recieve the data using recvfrom() which includes source arguments */
-            recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen);
+            while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            {
+                /* Update receive counts */
+                data->rx_count++;
+            }
+
+            /* Use clock_gettime() to stop the per-packet-burst timer */
             clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
 
             /* Recalculate the timeout interval using the TimeInterval() function */
             TimeInterval(&packetdata);  
-
-            /* Update both send and recieve counts */
-            data->tx_count ++;
-            data->rx_count ++;  
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
-            /* Only update the number of sent packets */
-            data->tx_count++; 
-
             /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
             timeout_µs *= 2;
 
@@ -188,9 +192,10 @@ void *client_thread_func(void *arg)
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
             data->avg_timeout += (timeout_µs);
             data->progress += 1; /* update the number of 10% increments completed */
-        }
 
-        i++;
+            /* !!TESTING PURPOSES ONLY NOT FOR PRODUCTION!! */
+            printf("Current timeout: %ld µs\n", timeout_µs);
+        }
     }
 
     return NULL;
@@ -200,8 +205,8 @@ void *client_thread_func(void *arg)
 collect performance data of each threads, and compute aggregated metrics of all threads */
 void run_client() 
 {
-    pthread_t threads[num_client_threads];
-    client_thread_data_t thread_data[num_client_threads];
+    pthread_t threads[num_threads];
+    client_thread_data_t thread_data[num_threads];
 
     int num_threads_created = 0; /* keep track of the number of threads successfully created */
     long total_packets_sent = 0; /* accumulate the total number of sent packets for each thread */
@@ -211,7 +216,7 @@ void run_client()
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */
     int i = 0;
-    while (i < num_client_threads && !stop)
+    while (i < num_threads && !stop)
     {
         /* Create an unreliable, UDP datagram socket using UDP */ 
         if ((thread_data[i].client_fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -228,6 +233,7 @@ void run_client()
         /* Pass the thread_data to pthread_create() */   
         pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
 
+        /* Update the number of threads actually created and loop control variable*/
         num_threads_created++;
         i++;
     }
@@ -269,11 +275,11 @@ void run_client()
 
     if (average_timeout > 0) /* only print average timeout if all threads have sent at least 10% of their packets */
     {
-        printf("Average Timeout Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+        printf("Average Timeout Interval Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
     }
     else
     {
-        puts("Average Timeout Across all Threads: NA");
+        puts("Average Timeout Interval Across all Threads: NA");
     }
 
     puts("==============================================================");
@@ -349,29 +355,35 @@ void run_server()
     {
         clntLen = sizeof(ClntAddr); /* set the size of the in-out parameter */ 
         
-        if (epoll_wait(server_fd, events, MAX_EVENTS, -1) < 0 && errno != EINTR)
+        int nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1); /* wait indefinitely for events on the socket */
+        if (nfds > 0)
+        {
+            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+            {
+                sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+
+                if (sentMsgSize != recvMsgSize) 
+                {
+                    DieWithError("sendto() sent a different number of bytes than expected");
+                } 
+            }
+
+            if (recvMsgSize < 0 && errno != EAGAIN)
+            {
+                DieWithError("recvfrom() failed or connection closed prematurely");
+            }
+        }
+        else if (nfds < 0) /* if epoll_wait() returns an error other than being interrupted by a signal */
         {
             DieWithError("epoll_wait() failed");
-        }
-
-        while ((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
-        {
-            sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
-
-            if (sentMsgSize != recvMsgSize) 
-            {
-                DieWithError("sendto() sent a different number of bytes than expected");
-            } 
-        }
-
-        if (recvMsgSize < 0 && errno != EAGAIN)
-        {
-            DieWithError("recvfrom() failed or connection closed prematurely");
-        }                
+        }          
     }
 
     puts("\ninterrupt signal recieved; shutting down server and closing UDP listening socket ...");
+
+    /* Close the listening socket and the server epoll instance */
     close(UDPSock);
+    close(server_fd);
 }
 
 int main(int argc, char *argv[]) 
@@ -393,14 +405,15 @@ int main(int argc, char *argv[])
     {
         if (argc > 2) server_ip = argv[2];
         if (argc > 3) server_port = atoi(argv[3]);
-        if (argc > 4) num_client_threads = atoi(argv[4]);
+        if (argc > 4) num_threads = atoi(argv[4]); /* Initialize number of threads (if given), defaults to 4 */
         if (argc > 5) num_requests = atoi(argv[5]);
+        if (argc > 6) pipeline_size = atoi(argv[6]); /* Initialize pipeline size (if given), defaults to 8 */
 
         run_client();
     } 
     else 
     {
-        printf("Usage: %s <server|client> [server_ip server_port num_client_threads num_requests]\n", argv[0]);
+        printf("Usage: %s <server|client> [server_ip server_port num_client_threads num_requests pipeline_size]\n", argv[0]);
     }
 
     return 0;
