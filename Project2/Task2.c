@@ -84,8 +84,8 @@ void *client_thread_func(void *arg)
     packetdata.alpha = 0.125; /* textbook value */
     packetdata.beta = 0.25; /* textbook value */
     packetdata.EstimatedRTT = 10; /* time in µs */
-    packetdata.TimeoutInterval.tv_sec = 0; /* time in s (this value will pretty much always be zero) */
-    packetdata.TimeoutInterval.tv_nsec = (10000 * num_threads * pipeline_size); /* time in ns */
+    packetdata.TimeoutInterval.tv_sec = 0; /* time in s */
+    packetdata.TimeoutInterval.tv_nsec = (10000 * num_threads * pipeline_size); /* time in ns, scales with initial load */
 
     /* This value will represent timeout of each packet in µs */
     long timeout_µs = 0;
@@ -148,8 +148,8 @@ void *client_thread_func(void *arg)
             packetdata.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
 
-        /* If timeout exceeds 1 second, something has gone seriously wrong */
-        if (timeout_µs > 1000000) 
+        /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
+        if (timeout_µs > (10000 * num_threads * pipeline_size)) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
