@@ -63,7 +63,7 @@ typedef struct {
     int client_fd;      /* file descriptor for the client socket on which data is sent to the server. */
     long tx_count;       /* accumulated number of sent packets for each thread */
     long rx_count;       /* accumulated number of recieved packets for each thread */
-    long avg_timeout; /* average timeout interval for each thread (in µs) */
+    unsigned long avg_timeout; /* average timeout interval for each thread (in µs) */
     unsigned short progress; /* used for tracking the percent completion of each thread */
 } client_thread_data_t;
 
@@ -193,8 +193,8 @@ void *client_thread_func(void *arg)
             data->avg_timeout += (timeout_µs);
             data->progress += 1; /* update the number of 10% increments completed */
 
-            /* !!TESTING PURPOSES ONLY NOT FOR PRODUCTION!! */
-            printf("Current timeout: %ld µs\n", timeout_µs);
+            /* Testing purposes only */
+            // printf("Current timeout: %ld µs\n", timeout_µs);
         }
     }
 
