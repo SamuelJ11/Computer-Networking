@@ -19,7 +19,7 @@ void TimeInterval(calcTimeIntval *packetdata)
     /* Compute the round trip time in microsends before populating the timespec struct*/
     long rto_µs = packetdata->EstimatedRTT + 4*(packetdata->DevRTT); /* time in µs */
     
-    /* Finally, obtain use the formula for retransmission timeout interval as a function of EstimatedRTT and DevRTT */
+    /* Finally, use the formula for retransmission timeout interval as a function of EstimatedRTT and DevRTT */
     packetdata->TimeoutInterval.tv_sec = rto_µs  / 1000000; /* convert µs to s */
     packetdata->TimeoutInterval.tv_nsec = (rto_µs % 1000000) * 1000; /* convert µs to ns safely without overflowing */
 }
