@@ -92,8 +92,13 @@ void *client_thread_func(void *arg)
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
 
-    /* Declare a client packet struct that will hold the packet payload and header */
-    client_struct packet;
+    /* Declare a client and server packet struct that will hold the packet payload and header (control) information */
+    server_struct server_packet; /* this struct is only used for sending packets back to the server */
+    client_struct client_packet; /* this struct is only used for deserializing packets from the client */
+
+    /* . . . */
+    int recv_size = sizeof(server_packet); /* size of the buffer that will temporarily hold the deserialized packet from the server */
+    char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
@@ -126,8 +131,8 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
-            packet.seq_num[i] = (i % 1000); /* wraps around after 1000 */
-            char *send_buf = Serialize(0, packet); 
+            client_packet.seq_num[i] = (i % 1000); /* wraps around after 1000 */
+            char *send_buf = Serialize(0, client_packet); 
 
             /* Send the message using sendto(), which includes destination arguments */
             if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
@@ -161,11 +166,22 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-            /* Assign the appropriate sequence number and deserialize the packet from a byte stream for recieving */
-            packet = Deserialize(1, ???); /* return to this once server side implementation is complete */
-
             while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
+                /* Deserialize the packets recieved from the client and reconstruct its data */
+                server_packet = Deserialize(1, recv_buf); 
+
+                /* Declare a temporary array that will hold the sequence numbers of the packets that have been acknowledged by the server */
+                int packets_acked[1000]; 
+
+                /* Copy the acknowledgment numbers from the server into packets_acked */
+                memcpy(&packets_acked, server_packet.ack_num, sizeof(server_packet.ack_num));
+
+                /* Copy the echoed message */
+                memcpy(&client_packet.client_buf, server_packet.echo_buf, sizeof(server_packet.echo_buf));
+
+                /* Implement Go-Back-N logic */
+                
                 
                 /* Update receive counts */
                 data->rx_count++;
@@ -314,10 +330,13 @@ void run_server()
     /* Initialize a boolean flag for tracking initial data receipt */
     unsigned char data_recieved = 0; 
 
-    /* Declare a server packet struct that will hold the packet payload and header */
-    server_struct packet;
-    int echobuf_size = sizeof(packet); /* size of the buffer that will temporarilyhold the deserialized packet from the client */
-    char echobuf[echobuf_size]; /* buffer that will temporarily hold the deserialized packet from the client */
+    /* Declare a client and server packet struct that will hold the packet payload and header (control) information */
+    server_struct server_packet; /* this struct is used for sending acknowledge packets back to the client */
+    client_struct client_packet; /* this struct is only used for deserializing packets from the client */
+
+    /* . . . */
+    int recv_size = sizeof(client_packet); /* size of the buffer that will temporarily hold the deserialized packet from the client */
+    char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
 
     /* Initialize the event struct for the server*/
     int UDPSock;
@@ -372,12 +391,17 @@ void run_server()
                 data_recieved = 1; /* do not enter this block again in the current loop iteration */
             }
 
-            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+            while((recvMsgSize = recvfrom(UDPSock, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
-                /* Deserialize the packets recieved from the client */
-                packet = Deserialize(0, echobuf); 
+                /* Deserialize the packets recieved from the client and reconstruct its data */
+                client_packet = Deserialize(0, recv_buf); 
 
+                /* Copy the sequence numbers of sent packets and the message from the client into the appropriate fields for server */
+                memcpy(&server_packet.ack_num, client_packet.seq_num, sizeof(client_packet.seq_num));
+                memcpy(&server_packet.echo_buf, client_packet.message, sizeof(client_packet.message));
 
+                /* Serialize the server packet for retransmission back to the client */
+                char *echobuf = Serialize(1, server_packet);
 
                 sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
