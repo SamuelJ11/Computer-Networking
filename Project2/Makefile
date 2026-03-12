@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -g -pthread
 
 HEADERS = TimeInterval.h
-COMMON_SOURCES = SetNonBlocking.c TimeInterval.c
+COMMON_SOURCES = TimeInterval.c
 
 TASK1_SOURCES = Task1.c $(COMMON_SOURCES)
 TASK1_OBJECTS = $(TASK1_SOURCES:.c=.o)
