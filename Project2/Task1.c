@@ -14,9 +14,9 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 8
+#define DEFAULT_CLIENT_THREADS 4
 #define NUM_REQUESTS 1000000
-#define PIPELINE 8
+#define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
 int server_port = 12345;
@@ -54,8 +54,6 @@ void Signal(int signum, sighandler_t handler)
         DieWithError("sigaction() failed");
     }
 }
-
-void SetNonBlocking(int fd); /* function for setting non-blocking flags for file descriptors */
 
 /* This structure is used to store per-thread data in the client */
 typedef struct {
@@ -95,9 +93,6 @@ void *client_thread_func(void *arg)
     char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
     char recv_buf[MESSAGE_SIZE];
 
-    /* Set client_fd to non-blocking when epoll starts watching it*/
-    SetNonBlocking(data->client_fd);
-
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
     ev.data.fd = data->client_fd;
@@ -129,7 +124,7 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, 0, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
@@ -160,7 +155,7 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-            while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, 0, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
                 /* Update receive counts */
                 data->rx_count++;
@@ -334,10 +329,6 @@ void run_server()
         DieWithError ("bind() failed");
     } 
 
-    /* Set UDP socket to non-blocking to ensure recvfrom() returns immediately if no 
-    data is ready, rather than freezing the thread */
-    SetNonBlocking(UDPSock);
-    
     /* Create the epoll instance for the server */
     int server_fd = epoll_create(1);
     if (server_fd < 0) 
@@ -365,9 +356,9 @@ void run_server()
                 data_recieved = 1; /* do not enter this block again in the current loop iteration */
             }
 
-            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
-                sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+                sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
                 if (sentMsgSize != recvMsgSize) 
                 {
