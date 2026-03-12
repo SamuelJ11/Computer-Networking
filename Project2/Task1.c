@@ -305,10 +305,11 @@ void run_server()
     int recvMsgSize; /* size of received message */ 
     int sentMsgSize; /* size of echoed message */
 
-    /* Intitialize a file descriptor that will become the UDP server socket */  
-    int UDPSock; 
+    /* Initialize a boolean flag for tracking initial data receipt */
+    unsigned short data_recieved = 0; 
 
     /* Initialize the event struct for the server*/
+    int UDPSock;
     struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN; /* The server is listening for read operation */
 
@@ -353,11 +354,17 @@ void run_server()
     /* Server's run-to-completion event loop */
     while (!stop) 
     {
-        clntLen = sizeof(ClntAddr); /* set the size of the in-out parameter */ 
-        
+        clntLen = sizeof(ClntAddr); /* set the size of the in-out parameter */         
         int nfds = epoll_wait(server_fd, events, MAX_EVENTS, -1); /* wait indefinitely for events on the socket */
+
         if (nfds > 0)
         {
+            if (data_recieved == 0) /* only print this message once per loop iteration, even if multiple packets are received */
+            {
+                puts("server has successfully recieved data; responding to client ...");
+                data_recieved = 1; /* do not enter this block again in the current loop iteration */
+            }
+
             while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, 0, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
                 sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, 0, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
@@ -373,7 +380,7 @@ void run_server()
                 DieWithError("recvfrom() failed or connection closed prematurely");
             }
         }
-        else if (nfds < 0) /* if epoll_wait() returns an error other than being interrupted by a signal */
+        else if (nfds < 0 && !stop) /* if epoll_wait() returns an error other than being interrupted by a signal */
         {
             DieWithError("epoll_wait() failed");
         }          
