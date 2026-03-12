@@ -93,7 +93,7 @@ void *client_thread_func(void *arg)
     struct epoll_event ev, events[MAX_EVENTS];
 
     /* Declare a client packet struct that will hold the packet payload and header */
-    packet_struct packet;
+    client_struct packet;
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
@@ -127,7 +127,7 @@ void *client_thread_func(void *arg)
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
             packet.seq_num[i] = (i % 1000); /* wraps around after 1000 */
-            char *send_buf = Serialize(packet); 
+            char *send_buf = Serialize(0, packet); 
 
             /* Send the message using sendto(), which includes destination arguments */
             if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
@@ -161,12 +161,12 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-             
+            /* Assign the appropriate sequence number and deserialize the packet from a byte stream for recieving */
+            packet = Deserialize(1, ???); /* return to this once server side implementation is complete */
+
             while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
-                /* Assign the appropriate sequence number and deserialize the packet from a byte stream for recieving */
-                packet = Deserialize(recv_buf); /* return to this once server side implementation is complete */
-
+                
                 /* Update receive counts */
                 data->rx_count++;
             }
@@ -309,12 +309,15 @@ void run_server()
     char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
     int recvMsgSize; /* size of received message */ 
     int sentMsgSize; /* size of echoed message */
+   
 
     /* Initialize a boolean flag for tracking initial data receipt */
-    unsigned short data_recieved = 0; 
+    unsigned char data_recieved = 0; 
 
     /* Declare a server packet struct that will hold the packet payload and header */
-    packet_struct packet;
+    server_struct packet;
+    int echobuf_size = sizeof(packet); /* size of the buffer that will temporarilyhold the deserialized packet from the client */
+    char echobuf[echobuf_size]; /* buffer that will temporarily hold the deserialized packet from the client */
 
     /* Initialize the event struct for the server*/
     int UDPSock;
@@ -372,6 +375,10 @@ void run_server()
             while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
                 /* Deserialize the packets recieved from the client */
+                packet = Deserialize(0, echobuf); 
+
+
+
                 sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
                 if (sentMsgSize != recvMsgSize) 
