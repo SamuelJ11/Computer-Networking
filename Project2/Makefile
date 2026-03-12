@@ -1,14 +1,14 @@
 CC = gcc
 CFLAGS = -Wall -g -pthread
 
-HEADERS = TimeInterval.h
+HEADERS = TimeInterval.h Packet.h
 COMMON_SOURCES = TimeInterval.c
 
 TASK1_SOURCES = Task1.c $(COMMON_SOURCES)
 TASK1_OBJECTS = $(TASK1_SOURCES:.c=.o)
 TASK1_EXEC = PA2_Task1
 
-TASK2_SOURCES = Task2.c $(COMMON_SOURCES)
+TASK2_SOURCES = Task2.c Packet.c $(COMMON_SOURCES)
 TASK2_OBJECTS = $(TASK2_SOURCES:.c=.o)
 TASK2_EXEC = PA2_Task2
 
