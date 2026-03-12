@@ -3,7 +3,7 @@
 
 #define CLIENT_PACKET_SIZE 34 /* 2 bytes for sequence number + 16 bytes for message + 16 bytes for client buffer */
 #define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
-#define DEFAULT_CLIENT_THREADS 4
+#define MESSAGE_SIZE 16 /* fixed message size of 16 bytes */
 
 #include <string.h> /* for memcpy() */
 

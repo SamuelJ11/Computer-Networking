@@ -14,7 +14,7 @@
 #include "Packet.h"
 
 #define MAX_EVENTS 64
-#define MESSAGE_SIZE 16
+#define DEFAULT_CLIENT_THREADS 4
 #define NUM_REQUESTS 1000000
 #define PIPELINE 4
 
