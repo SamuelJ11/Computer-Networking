@@ -16,6 +16,8 @@
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
 #define DEFAULT_CLIENT_THREADS 4
+#define CLIENT_PACKET_SIZE 34 /* 2 bytes for sequence number + 16 bytes for message + 16 bytes for client buffer */
+#define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
 #define NUM_REQUESTS 1000000
 #define PIPELINE 4
 
@@ -97,8 +99,7 @@ void *client_thread_func(void *arg)
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
     /* . . . */
-    int recv_size = sizeof(server_packet); /* size of the buffer that will temporarily hold the deserialized packet from the server */
-    char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
+    char recv_buf[SERVER_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
@@ -131,11 +132,12 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
-            client_packet.seq_num[i] = (i % 1000); /* wraps around after 1000 */
-            char *send_buf = Serialize(0, client_packet); 
+            client_packet.seq_num = (i % 1000); /* wraps around after 1000 */
+            char send_buf[CLIENT_PACKET_SIZE];
+            SerializeClient(&client_packet, send_buf); 
 
             /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(data->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+            if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
@@ -166,22 +168,29 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-            while ((recvfrom(data->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            while ((recvfrom(data->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
-                server_packet = Deserialize(1, recv_buf); 
+                DeserializeServer(recv_buf, &server_packet);
 
-                /* Declare a temporary array that will hold the sequence numbers of the packets that have been acknowledged by the server */
-                int packets_acked[1000]; 
+                /* Something went wrong */
+                if (server_packet.expected_seqnum != client_packet.seq_num)
+                {
+                    puts("expected sequence number does not match received sequence number; resending last acknowledged packet ...");
 
-                /* Copy the acknowledgment numbers from the server into packets_acked */
-                memcpy(&packets_acked, server_packet.ack_num, sizeof(server_packet.ack_num));
+                    /* Replace the client's sequence number with the server's last correctly recieved packet number */
+                    client_packet.seq_num = server_packet.expected_seqnum;
 
-                /* Copy the echoed message */
-                memcpy(&client_packet.client_buf, server_packet.echo_buf, sizeof(server_packet.echo_buf));
+                    /* Resend all packets > that sequence number withing the givin pipeline size */
+                    char send_buf[34];
+                    SerializeClient(&client_packet, send_buf);
 
-                /* Implement Go-Back-N logic */
-                
+                    if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+                    {
+                        DieWithError("sendto() sent a different number of bytes than expected");
+                    }
+
+                }
                 
                 /* Update receive counts */
                 data->rx_count++;
@@ -337,6 +346,7 @@ void run_server()
     /* . . . */
     int recv_size = sizeof(client_packet); /* size of the buffer that will temporarily hold the deserialized packet from the client */
     char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
+    unsigned short expected_seqnum = 0; /* used to hold the expected sequence number of the next packet from the client, initialized to 0 */
 
     /* Initialize the event struct for the server*/
     int UDPSock;
@@ -396,7 +406,8 @@ void run_server()
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 client_packet = Deserialize(0, recv_buf); 
 
-                /* Copy the sequence numbers of sent packets and the message from the client into the appropriate fields for server */
+                /* Ensure the sequence number of the client's current packet matches that of the expected sequence number of the server */
+                if (client_packet.seq_num[])
                 memcpy(&server_packet.ack_num, client_packet.seq_num, sizeof(client_packet.seq_num));
                 memcpy(&server_packet.echo_buf, client_packet.message, sizeof(client_packet.message));
 
