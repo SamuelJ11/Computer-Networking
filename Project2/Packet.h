@@ -5,7 +5,6 @@
 #define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
 #define DEFAULT_CLIENT_THREADS 4
 
-
 #include <string.h> /* for memcpy() */
 
 /* Initialize the struct members with a fixed message size and sequence number array */
