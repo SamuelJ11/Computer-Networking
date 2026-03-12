@@ -15,9 +15,6 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 4
-#define CLIENT_PACKET_SIZE 34 /* 2 bytes for sequence number + 16 bytes for message + 16 bytes for client buffer */
-#define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
 #define NUM_REQUESTS 1000000
 #define PIPELINE 4
 
