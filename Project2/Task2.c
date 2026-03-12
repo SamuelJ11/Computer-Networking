@@ -328,11 +328,9 @@ void run_server()
     struct sockaddr_in ServAddr; /* local address of server */ 
     struct sockaddr_in ClntAddr; /* client address */     
     unsigned int clntLen; /* length of client address data structure */
-    char echobuf[MESSAGE_SIZE]; /* length of message to echo back to client */
     int recvMsgSize; /* size of received message */ 
     int sentMsgSize; /* size of echoed message */
    
-
     /* Initialize a boolean flag for tracking initial data receipt */
     unsigned char data_recieved = 0; 
 
@@ -340,10 +338,12 @@ void run_server()
     server_struct server_packet; /* this struct is used for sending acknowledge packets back to the client */
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
+    /* Initialize the expected sequence number to 0 */
+    server_packet.expected_seqnum = 0; 
+
     /* . . . */
     int recv_size = sizeof(client_packet); /* size of the buffer that will temporarily hold the deserialized packet from the client */
     char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
-    unsigned short expected_seqnum = 0; /* used to hold the expected sequence number of the next packet from the client, initialized to 0 */
 
     /* Initialize the event struct for the server*/
     int UDPSock;
@@ -401,22 +401,29 @@ void run_server()
             while((recvMsgSize = recvfrom(UDPSock, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
-                client_packet = Deserialize(0, recv_buf); 
+                DeserializeClient(recv_buf, &client_packet); 
 
                 /* Ensure the sequence number of the client's current packet matches that of the expected sequence number of the server */
-                if (client_packet.seq_num[])
-                memcpy(&server_packet.ack_num, client_packet.seq_num, sizeof(client_packet.seq_num));
-                memcpy(&server_packet.echo_buf, client_packet.message, sizeof(client_packet.message));
-
-                /* Serialize the server packet for retransmission back to the client */
-                char *echobuf = Serialize(1, server_packet);
-
-                sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
-
-                if (sentMsgSize != recvMsgSize) 
+                if (client_packet.seq_num == server_packet.expected_seqnum)
                 {
-                    DieWithError("sendto() sent a different number of bytes than expected");
-                } 
+                    /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
+                    server_packet.expected_seqnum = (server_packet.expected_seqnum + 1) % 1000; /* wraps around after 1000 */
+
+                    /* Echo the message back to the client*/
+                    char echo_buf[SERVER_PACKET_SIZE];
+                    SerializeServer(&server_packet, echo_buf); 
+                    sentMsgSize = sendto(UDPSock, echo_buf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+
+                    if (sentMsgSize != recvMsgSize) 
+                    {
+                        DieWithError("sendto() sent a different number of bytes than expected");
+                    } 
+                }
+                else
+                {
+                    /* Ignore the invalid packet */
+                    puts("expected sequence number does not match received sequence number; ignoring packet ...");
+                }
             }
 
             if (recvMsgSize < 0 && errno != EAGAIN)
