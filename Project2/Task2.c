@@ -154,7 +154,7 @@ void *client_thread_func(void *arg)
         }
 
         /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
-        if (timeout_µs > (10000 * num_threads * pipeline_size)) 
+        if (timeout_µs > (100000000 * num_threads * pipeline_size)) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
@@ -171,22 +171,22 @@ void *client_thread_func(void *arg)
                 DeserializeServer(recv_buf, &server_packet);
 
                 /* Something went wrong */
-                if (server_packet.expected_seqnum != client_packet.seq_num)
+                if (server_packet.expected_seqnum < client_packet.seq_num)
                 {
-                    puts("expected sequence number does not match received sequence number; resending last acknowledged packet ...");
-
                     /* Replace the client's sequence number with the server's last correctly recieved packet number */
                     client_packet.seq_num = server_packet.expected_seqnum;
 
-                    /* Resend all packets > that sequence number withing the givin pipeline size */
-                    char send_buf[34];
+                    /* Resend all packets that a sequence number > expected_seqnum */
+                    char send_buf[CLIENT_PACKET_SIZE];
                     SerializeClient(&client_packet, send_buf);
 
-                    if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+                    while (client_packet.seq_num != server_packet.expected_seqnum)
                     {
-                        DieWithError("sendto() sent a different number of bytes than expected");
+                        if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
+                        {
+                            DieWithError("sendto() sent a different number of bytes than expected");
+                        }
                     }
-
                 }
                 
                 /* Update receive counts */
@@ -221,7 +221,7 @@ void *client_thread_func(void *arg)
             data->progress += 1; /* update the number of 10% increments completed */
 
             /* Testing purposes only */
-            // printf("Current timeout: %ld µs\n", timeout_µs);
+            printf("Current timeout: %ld µs\n", timeout_µs);
         }
     }
 
@@ -342,8 +342,7 @@ void run_server()
     server_packet.expected_seqnum = 0; 
 
     /* . . . */
-    int recv_size = sizeof(client_packet); /* size of the buffer that will temporarily hold the deserialized packet from the client */
-    char recv_buf[recv_size]; /* buffer that will temporarily hold the deserialized packet */
+    char recv_buf[CLIENT_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
 
     /* Initialize the event struct for the server*/
     int UDPSock;
@@ -398,7 +397,7 @@ void run_server()
                 data_recieved = 1; /* do not enter this block again in the current loop iteration */
             }
 
-            while((recvMsgSize = recvfrom(UDPSock, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+            while((recvMsgSize = recvfrom(UDPSock, recv_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeClient(recv_buf, &client_packet); 
@@ -410,19 +409,16 @@ void run_server()
                     server_packet.expected_seqnum = (server_packet.expected_seqnum + 1) % 1000; /* wraps around after 1000 */
 
                     /* Echo the message back to the client*/
+                    memcpy(server_packet.echo_buf, client_packet.message, MESSAGE_SIZE); /* copy the message from the client packet to the server packet's echo buffer */
                     char echo_buf[SERVER_PACKET_SIZE];
-                    SerializeServer(&server_packet, echo_buf); 
-                    sentMsgSize = sendto(UDPSock, echo_buf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
-                    if (sentMsgSize != recvMsgSize) 
+                    SerializeServer(&server_packet, echo_buf); 
+                    sentMsgSize = sendto(UDPSock, echo_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+
+                    if (sentMsgSize != SERVER_PACKET_SIZE) 
                     {
                         DieWithError("sendto() sent a different number of bytes than expected");
                     } 
-                }
-                else
-                {
-                    /* Ignore the invalid packet */
-                    puts("expected sequence number does not match received sequence number; ignoring packet ...");
                 }
             }
 
