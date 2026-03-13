@@ -15,7 +15,7 @@
 
 #define MAX_EVENTS 64
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 1000000
+#define NUM_REQUESTS 1000
 #define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
@@ -69,7 +69,7 @@ typedef struct {
 void *client_thread_func(void *arg) 
 {
     client_thread_data_t *data = (client_thread_data_t *)arg; /* initialize client_thread_data_t struct within the thread */
-    calcTimeIntval packetdata; /* initialize calcTimeIntval struct */
+    calcTimeIntval packetdata; /* initialize calcTimeIntval (packet metadata) struct */
     
     /* Zero out accumulation metrics */
     data->tx_count = 0;
@@ -95,6 +95,9 @@ void *client_thread_func(void *arg)
     server_struct server_packet; /* this struct is only used for sending packets back to the server */
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
+    /* . . . */
+    memset(&client_packet, 0, CLIENT_PACKET_SIZE); /* zero out the client packet struct before initializing */
+    
     /* . . . */
     char recv_buf[SERVER_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
 
@@ -129,7 +132,7 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
-            client_packet.seq_num = (i % 1000); /* wraps around after 1000 */
+            client_packet.next_seqnum = (i % 1000); /* wraps around after 1000 */
             char send_buf[CLIENT_PACKET_SIZE];
             SerializeClient(&client_packet, send_buf); 
 
@@ -171,33 +174,39 @@ void *client_thread_func(void *arg)
                 DeserializeServer(recv_buf, &server_packet);
 
                 /* Something went wrong */
-                if (server_packet.expected_seqnum < client_packet.seq_num)
+                if (server_packet.expected_seqnum < client_packet.base)
                 {
-                    /* Replace the client's sequence number with the server's last correctly recieved packet number */
-                    client_packet.seq_num = server_packet.expected_seqnum;
-
-                    /* Resend all packets that a sequence number > expected_seqnum */
+                    /* Resend all packets that a base number > expected_seqnum */
                     char send_buf[CLIENT_PACKET_SIZE];
                     SerializeClient(&client_packet, send_buf);
 
-                    while (client_packet.seq_num != server_packet.expected_seqnum)
+                    while (client_packet.base != server_packet.expected_seqnum)
                     {
                         if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
                         {
                             DieWithError("sendto() sent a different number of bytes than expected");
                         }
+
+                        client_packet.base ++; /* increment the client's base number */
                     }
                 }
                 
-                /* Update receive counts */
-                data->rx_count++;
+                /* Update client's next sequence number and receive counts */
+                client_packet.next_seqnum = (server_packet.expected_seqnum + 1) % 1000;
+
+                data->rx_count++; /* update the number of recieved packets */
             }
+
+            /* Update the client's base number */
+            client_packet.next_seqnum = client_packet.next_seqnum % 1000;
 
             /* Use clock_gettime() to stop the per-packet-burst timer */
             clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
 
             /* Recalculate the timeout interval using the TimeInterval() function */
             TimeInterval(&packetdata);  
+
+
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
@@ -403,7 +412,7 @@ void run_server()
                 DeserializeClient(recv_buf, &client_packet); 
 
                 /* Ensure the sequence number of the client's current packet matches that of the expected sequence number of the server */
-                if (client_packet.seq_num == server_packet.expected_seqnum)
+                if (client_packet.next_seqnum == server_packet.expected_seqnum)
                 {
                     /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
                     server_packet.expected_seqnum = (server_packet.expected_seqnum + 1) % 1000; /* wraps around after 1000 */
