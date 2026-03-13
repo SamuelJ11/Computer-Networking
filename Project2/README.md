@@ -131,6 +131,65 @@ The output of running the code using the default parameters gives this output on
     Total Number of Retransmissions Across All Threads: 128
     ==============================================================
 
+### Errors
+
+The code for checking whether a packet's given timeout value is within an acceptable range is given below (lines 143 - 154):
+
+    • if (timeout_µs < (10 * num_threads * pipeline_size))
+        {
+            /* Restore timeout and update the timespec struct that epoll_pwait2() actually uses */
+            timeout_µs = (10 * num_threads * pipeline_size);
+            packettiming.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
+        }
+        /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
+        if (timeout_µs > (10000 * num_threads * pipeline_size)) 
+        {
+            puts("server is overloaded or not responding; maximum timeout exceeded");
+            exit(1);
+        }
+
+This code checks whether the time it took for the client to receive a response from the server is within a certain range.
+
+Here the minimum timeout value is in microseconds (µs), and if the program is run with the default parameters (4 threads, pipeline size of 4), then the minimum timeout is calculated as:
+
+    • 4 x 4 x 10 = 160 µs
+
+Similarly the maximum timeout value is simply 1000x this minimum value:
+
+    • 160 x 1000 = 160000 µs = 0.16 s
+
+Every time a timeout occurs, the timeout value will double (temporarily) to avoid a premature timeout for the next packet (lines 176 - 184):
+
+    •  else if (nfds == 0) /* timeout (packet loss) */
+        {
+            /* Double the TimeoutInterval (temporarily) to avoid a premature timeout for the next packet */
+            timeout_µs *= 2;
+
+            /* Update the timespec struct that epoll_pwait2() actually uses */
+            packettiming.TimeoutInterval.tv_sec = timeout_µs / 1000000;
+            packettiming.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
+        }
+
+If too many consecutive timeouts occur, the timeout value will keep doubling until eventually the maximum timeout value is reached.
+
+This will lead the client to assume something has gone wrong with the connection, as denoted by the following error message:
+
+    • server is overloaded or not responding; maximum timeout exceeded
+
+If encountering this error message, sometimes re-running the program once or twice will resolve the issue.
+
+If this doesn't work, re-run the program and try halving one of the last three parameters supplied to the program:
+
+For example, you could try:
+
+    • ./PA2_Task1 client 127.0.0.1 12345 4 1000000 2    (halved pipeline size)
+    • ./PA2_Task1 client 127.0.0.1 12345 2 1000000 4    (halved thread count)
+    • ./PA2_Task1 client 127.0.0.1 12345 4 500000 4    (halved number of requests)
+
+Additionally, this approach can be adopted for Task 2 if necessary.
+
+The hardware specifications of your device or whether or not the program is being run in a native Linux environment will greatly impact the likelihood of this error occurring.
+
 ### Remarks
 
 Task 2, while functional, is not completely robust and, dare I say, correct.
@@ -139,7 +198,7 @@ In the run_server() function, there is a line of code that is as follows:
     
     • server_packet.expected_seqnum = client_packet.next_seqnum + 1; (line 414) 
 
-Then later it just echos this information back to the client:
+Then later it just echoes this information back to the client:
 
     • SerializeServer(&server_packet, echo_buf);            (line 420)                 
     • sentMsgSize = sendto(UDPSock, echo_buf,  . . . );     (line 421) 
@@ -180,7 +239,7 @@ This value had to be set relatively low, otherwise a "runaway" scenario was obse
 
     • while (client_packet.base < num_requests && !stop)
 
-Will always be true and the loop never terminates unless the user interrups the client program (ctrl + c).
+Will always be true and the loop never terminates unless the user interrupts the client program (ctrl + c).
 
 I'm not sure if the issue described above is causing this "runaway" behavior or not, and I was not able to debug it in time.
 
