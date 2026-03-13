@@ -342,9 +342,6 @@ void run_server()
     server_struct server_packet; /* this struct is used for sending acknowledge packets back to the client */
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
-    /* Initialize the expected sequence number to 0 */
-    server_packet.expected_seqnum = 0; 
-
     /* . . . */
     char recv_buf[CLIENT_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
 
@@ -406,24 +403,20 @@ void run_server()
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeClient(recv_buf, &client_packet); 
 
-                /* Ensure the sequence number of the client's current packet matches that of the expected sequence number of the server */
-                if (client_packet.next_seqnum == server_packet.expected_seqnum)
+                /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
+                server_packet.expected_seqnum = client_packet.next_seqnum + 1;
+
+                /* Echo the message back to the client*/
+                memcpy(server_packet.echo_buf, client_packet.message, MESSAGE_SIZE); /* copy the message from the client packet to the server packet's echo buffer */
+                char echo_buf[SERVER_PACKET_SIZE];
+
+                SerializeServer(&server_packet, echo_buf); 
+                sentMsgSize = sendto(UDPSock, echo_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
+
+                if (sentMsgSize != SERVER_PACKET_SIZE) 
                 {
-                    /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
-                    server_packet.expected_seqnum++; 
-
-                    /* Echo the message back to the client*/
-                    memcpy(server_packet.echo_buf, client_packet.message, MESSAGE_SIZE); /* copy the message from the client packet to the server packet's echo buffer */
-                    char echo_buf[SERVER_PACKET_SIZE];
-
-                    SerializeServer(&server_packet, echo_buf); 
-                    sentMsgSize = sendto(UDPSock, echo_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
-
-                    if (sentMsgSize != SERVER_PACKET_SIZE) 
-                    {
-                        DieWithError("sendto() sent a different number of bytes than expected");
-                    } 
-                }
+                    DieWithError("sendto() sent a different number of bytes than expected");
+                } 
             }
 
             if (recvMsgSize < 0 && errno != EAGAIN)
