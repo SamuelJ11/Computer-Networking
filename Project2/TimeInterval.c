@@ -1,4 +1,3 @@
-#include <math.h>
 #include "TimeInterval.h"
 
 void TimeInterval(calcTimeIntval *pt) 

@@ -2,6 +2,7 @@
 #define TIMEINTERVAL_H
 
 #include <time.h>
+#include <math.h>
 
 typedef struct {
     struct timespec start;
