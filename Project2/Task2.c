@@ -95,11 +95,11 @@ void *client_thread_func(void *arg)
     server_struct server_packet; /* this struct is only used for sending packets back to the server */
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
-    /* . . . */
-    memset(&client_packet, 0, CLIENT_PACKET_SIZE); /* zero out the client packet struct before initializing */
+    /* Zero out the client packet struct before initializing */
+    memset(&client_packet, 0, CLIENT_PACKET_SIZE); 
     
-    /* . . . */
-    char recv_buf[SERVER_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
+    /* Initialize the recieve buffer that will temporarily hold the deserialized server packet */
+    char recv_buf[SERVER_PACKET_SIZE]; 
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
@@ -121,10 +121,10 @@ void *client_thread_func(void *arg)
     struct sockaddr_in fromAddr;
     socklen_t fromLen = sizeof(fromAddr);
 
-    /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
+    /* Initialize the master loop control variable that represents the number of requests processed */
     int i = 0;
-    client_packet.base = 0; /* initialize the oldest unacknowledged packet to 0 */
 
+    /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
     while (client_packet.base < num_requests && !stop) 
     {
         /* Use clock_gettime() to start the per-packet-burst timer as it provides nanosecond precision */
@@ -132,7 +132,7 @@ void *client_thread_func(void *arg)
         clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
 
         /* Only send if we are within the window and have requests left */
-        while (i < client_packet.base + pipeline_size && i < num_requests) /* send up to pipeline_size packets before waiting for responses */
+        while (i < client_packet.base + pipeline_size && i < num_requests) 
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
             client_packet.next_seqnum = i;
@@ -146,7 +146,7 @@ void *client_thread_func(void *arg)
             }
 
             data->tx_count++; /* update the number of sent packets */
-            i++; /* update the number of requests fullfilled */
+            i++; 
         }
         /* Calculate the timeout in microseconds, updates with each iteration */
         timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
@@ -185,7 +185,6 @@ void *client_thread_func(void *arg)
                 }
                 
                 /* Update client's next sequence number and receive counts */
-                client_packet.next_seqnum = (server_packet.expected_seqnum + 1);
                 data->rx_count++;
             }
 
@@ -220,7 +219,7 @@ void *client_thread_func(void *arg)
             data->progress += 1; /* update the number of 10% increments completed */
 
             /* Testing purposes only */
-            printf("Current timeout: %ld µs\n", timeout_µs);
+            //printf("Current timeout: %ld µs\n", timeout_µs);
         }
     }
 
