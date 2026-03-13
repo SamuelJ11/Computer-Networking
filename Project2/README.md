@@ -131,7 +131,7 @@ The output of running the code using the default parameters gives this output on
     Total Number of Retransmissions Across All Threads: 128
     ==============================================================
 
-### Errors
+## 3. Errors
 
 The code for checking whether a packet's given timeout value is within an acceptable range is given below (lines 143 - 154):
 
@@ -190,7 +190,7 @@ Additionally, this approach can be adopted for Task 2 if necessary.
 
 The hardware specifications of your device or whether or not the program is being run in a native Linux environment will greatly impact the likelihood of this error occurring.
 
-### Remarks
+## 4. Remarks
 
 Task 2, while functional, is not completely robust and, dare I say, correct.
 
