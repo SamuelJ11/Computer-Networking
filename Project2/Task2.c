@@ -342,8 +342,8 @@ void run_server()
     server_struct server_packet; /* this struct is used for sending acknowledge packets back to the client */
     client_struct client_packet; /* this struct is only used for deserializing packets from the client */
 
-    /* . . . */
-    char recv_buf[CLIENT_PACKET_SIZE]; /* buffer that will temporarily hold the deserialized packet */
+    /* Initialize the buffer that will temporarily hold the deserialized packet from the client */
+    char recv_buf[CLIENT_PACKET_SIZE]; 
 
     /* Initialize the event struct for the server*/
     int UDPSock;
