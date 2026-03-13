@@ -69,23 +69,23 @@ typedef struct {
 /* This function runs in a separate client thread to handle communication with the server */ 
 void *client_thread_func(void *arg) 
 {
-    clientthread_metadata *data = (clientthread_metadata *)arg; /* initialize clientthread_metadata struct within the thread */
-    calcTimeIntval packetdata; /* initialize calcTimeIntval (packet metadata) struct */
+    clientthread_metadata *packetdata = (clientthread_metadata *)arg; /* initialize clientthread_metadata struct within the thread */
+    calcTimeIntval packettiming; /* initialize calcTimeIntval (packet metadata) struct */
     
     /* Zero out accumulation metrics */
-    data->tx_count = 0;
-    data->rx_count = 0;
-    data->avg_timeout = 0;
-    data->progress = 0;
-    data->retransmission = 0;
+    packetdata->tx_count = 0;
+    packetdata->rx_count = 0;
+    packetdata->avg_timeout = 0;
+    packetdata->progress = 0;
+    packetdata->retransmission = 0;
 
     /* Zero out timeout metrics, set initial timeout interval to 200 microseconds (µs) */
-    memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure before initializing */
-    packetdata.alpha = 0.125; /* textbook value */
-    packetdata.beta = 0.25; /* textbook value */
-    packetdata.EstimatedRTT = 10; /* time in µs */
-    packetdata.TimeoutInterval.tv_sec = 0; /* time in s */
-    packetdata.TimeoutInterval.tv_nsec = (10000 * num_threads * pipeline_size); /* time in ns, scales with initial load */
+    memset(&packettiming, 0, sizeof(packettiming)); /* Zero out structure before initializing */
+    packettiming.alpha = 0.125; /* textbook value */
+    packettiming.beta = 0.25; /* textbook value */
+    packettiming.EstimatedRTT = 10; /* time in µs */
+    packettiming.TimeoutInterval.tv_sec = 0; /* time in s */
+    packettiming.TimeoutInterval.tv_nsec = (10000 * num_threads * pipeline_size); /* time in ns, scales with initial load */
 
     /* This value will represent timeout of each packet in µs */
     long timeout_µs = 0;
@@ -105,10 +105,10 @@ void *client_thread_func(void *arg)
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
-    ev.data.fd = data->client_fd;
+    ev.data.fd = packetdata->client_fd;
 
     /* Register the socket from the interest list using epoll_ctl() */
-    if (epoll_ctl(data->epoll_fd, EPOLL_CTL_ADD, data->client_fd, &ev) < 0) 
+    if (epoll_ctl(packetdata->epoll_fd, EPOLL_CTL_ADD, packetdata->client_fd, &ev) < 0) 
     {
         DieWithError("failed to register client's connection socket to the interest list");
     }
@@ -131,7 +131,7 @@ void *client_thread_func(void *arg)
     {
         /* Use clock_gettime() to start the per-packet-burst timer as it provides nanosecond precision */
         /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
-        clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
+        clock_gettime(CLOCK_MONOTONIC, &packettiming.start);
 
         /* Only send if we are within the window and have requests left */
         while (i < client_packet.base + pipeline_size && i < num_requests) 
@@ -142,23 +142,23 @@ void *client_thread_func(void *arg)
             SerializeClient(&client_packet, send_buf); 
 
             /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
+            if (sendto(packetdata->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
 
-            data->tx_count++; /* update the number of sent packets */
+            packetdata->tx_count++; /* update the number of sent packets */
             i++; 
         }
         /* Calculate the timeout in microseconds, updates with each iteration */
-        timeout_µs = (packetdata.TimeoutInterval.tv_sec * 1000000) + (packetdata.TimeoutInterval.tv_nsec / 1000);
+        timeout_µs = (packettiming.TimeoutInterval.tv_sec * 1000000) + (packettiming.TimeoutInterval.tv_nsec / 1000);
 
         /* Reset timeout to a minimum of 10 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
         if (timeout_µs < (10 * num_threads * pipeline_size))
         {
             /* Restore timeout and update the timespec struct that epoll_pwait2() actually uses */
             timeout_µs = (10 * num_threads * pipeline_size);
-            packetdata.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
+            packettiming.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
 
         /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
@@ -169,11 +169,11 @@ void *client_thread_func(void *arg)
         }
 
         /* Wait until a packet arrives on the socket OR until the timeout expires */
-        int nfds = epoll_pwait2(data->epoll_fd, events, MAX_EVENTS, &packetdata.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
+        int nfds = epoll_pwait2(packetdata->epoll_fd, events, MAX_EVENTS, &packettiming.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
     
         if (nfds > 0) /* no time out */
         {
-            while ((recvfrom(data->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            while ((recvfrom(packetdata->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeServer(recv_buf, &server_packet);
@@ -187,14 +187,14 @@ void *client_thread_func(void *arg)
                 }
                 
                 /* Update client's next sequence number and receive counts */
-                data->rx_count++;
+                packetdata->rx_count++;
             }
 
             /* Use clock_gettime() to stop the per-packet-burst timer */
-            clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
+            clock_gettime(CLOCK_MONOTONIC, &packettiming.end);
 
             /* Recalculate the timeout interval using the TimeInterval() function */
-            TimeInterval(&packetdata);  
+            TimeInterval(&packettiming);  
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
@@ -202,11 +202,11 @@ void *client_thread_func(void *arg)
             timeout_µs *= 2;
 
             /* Update the timespec struct that epoll_pwait2() actually uses */
-            packetdata.TimeoutInterval.tv_sec = timeout_µs / 1000000;
-            packetdata.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
+            packettiming.TimeoutInterval.tv_sec = timeout_µs / 1000000;
+            packettiming.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
 
             /* Update the number of retransmissions for the current packet */
-            data->retransmission++;
+            packetdata->retransmission++;
 
             /* Go-Back-N: Reset 'i' to the 'base' so the next loop resends the whole window */
             i = client_packet.base;
@@ -220,8 +220,8 @@ void *client_thread_func(void *arg)
         if (i > 0 && i % (NUM_REQUESTS / 10) == 0)
         {
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
-            data->avg_timeout += (timeout_µs);
-            data->progress += 1; /* update the number of 10% increments completed */
+            packetdata->avg_timeout += (timeout_µs);
+            packetdata->progress += 1; /* update the number of 10% increments completed */
 
             /* Testing purposes only */
             //printf("Current timeout: %ld µs\n", timeout_µs);
