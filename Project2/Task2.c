@@ -36,6 +36,7 @@ void mysighandler(int signal)
     stop = 1;
 }
 
+/* Simple error reporting function */
 static void DieWithError(char *errorMessage) 
 { 
     perror(errorMessage); 
@@ -92,6 +93,8 @@ void *client_thread_func(void *arg)
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
+    int recvMsgSize; /* size of received message */ 
+    int sentMsgSize; /* size of echoed message */
 
     /* Declare a client and server packet struct that will hold the packet payload and header (control) information */
     server_struct server_packet; /* this struct is only used for sending packets back to the server */
@@ -112,7 +115,6 @@ void *client_thread_func(void *arg)
     {
         DieWithError("failed to register client's connection socket to the interest list");
     }
-
     /* Since UDP is connectionless, each packet must include the source and destination address */
     struct sockaddr_in ServAddr;  /* IPv4 address struct for server */
     ServAddr.sin_family = AF_INET; /* Internet address family */ 
@@ -142,13 +144,15 @@ void *client_thread_func(void *arg)
             SerializeClient(&client_packet, send_buf); 
 
             /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(packetdata->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
+            sentMsgSize = sendto(packetdata->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr));
+
+            if (sentMsgSize != CLIENT_PACKET_SIZE)
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
 
             packetdata->tx_count++; /* update the number of sent packets */
-            i++; 
+            i++; /* update the master loop control variable */
         }
         /* Calculate the timeout in microseconds, updates with each iteration */
         timeout_µs = (packettiming.TimeoutInterval.tv_sec * 1000000) + (packettiming.TimeoutInterval.tv_nsec / 1000);
@@ -160,20 +164,18 @@ void *client_thread_func(void *arg)
             timeout_µs = (10 * num_threads * pipeline_size);
             packettiming.TimeoutInterval.tv_nsec = timeout_µs * 1000; /* timespec struct uses nanoseconds */
         }
-
         /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
         if (timeout_µs > (10000 * num_threads * pipeline_size)) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
         }
-
         /* Wait until a packet arrives on the socket OR until the timeout expires */
         int nfds = epoll_pwait2(packetdata->epoll_fd, events, MAX_EVENTS, &packettiming.TimeoutInterval, &sigmask); /* now epoll_pwait2 can be interrupted */           
     
         if (nfds > 0) /* no time out */
         {
-            while ((recvfrom(packetdata->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            while ((recvMsgSize = recvfrom(packetdata->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeServer(recv_buf, &server_packet);
@@ -184,12 +186,15 @@ void *client_thread_func(void *arg)
                 if (server_packet.expected_seqnum > client_packet.base)
                 {
                     client_packet.base = server_packet.expected_seqnum;                
-                }
-                
+                }                
                 /* Update client's next sequence number and receive counts */
                 packetdata->rx_count++;
             }
-
+            /* Something is functionally wrong with the socket */
+            if (recvMsgSize < 0 && errno != EAGAIN)
+            {
+                DieWithError("recvfrom() failed or connection closed prematurely");
+            }
             /* Use clock_gettime() to stop the per-packet-burst timer */
             clock_gettime(CLOCK_MONOTONIC, &packettiming.end);
 
@@ -215,7 +220,6 @@ void *client_thread_func(void *arg)
         {
             DieWithError("epoll_pwait2() failed");
         }
-
         /* Update the average timeout for every 10% of messages sent */
         if (i > 0 && i % (NUM_REQUESTS / 10) == 0)
         {
@@ -224,7 +228,8 @@ void *client_thread_func(void *arg)
             packetdata->progress += 1; /* update the number of 10% increments completed */
 
             /* Testing purposes only */
-            //printf("Current timeout: %ld µs\n", timeout_µs);
+            // printf("current timeout: %ld µs; ", timeout_µs);
+            // printf("progress: %d%%\n", packetdata->progress * 10);
         }
     }
 
@@ -254,7 +259,6 @@ void run_client()
         {
             DieWithError("socket() failed");
         }
-
         /* Create the interest list (aka the epoll instance) for the client thread */
         thread_data[i].epoll_fd = epoll_create(1);
         if (thread_data[i].epoll_fd == -1) 
@@ -291,7 +295,7 @@ void run_client()
         {
             average_timeout += thread_data[i].avg_timeout / thread_data[i].progress;
         }
-        
+        /* Print thread results */
         printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
         printf("Total packets recieved: %ld \n", thread_rx_cnt);
@@ -322,6 +326,7 @@ void run_client()
     
     /* Close all client sockets */
     puts("client is shutting down, closing all thread sockets ...");
+
     for (int i = 0; i < num_threads_created; i++)
     {
         if (thread_data[i].client_fd > 0) /* socket is open */
@@ -360,7 +365,6 @@ void run_server()
     {
         DieWithError("socket() failed");
     }
-
     /* Set the file descriptor for the server to be the generic UDP socket */
     ev.data.fd = UDPSock;
     
@@ -375,20 +379,17 @@ void run_server()
     {
         DieWithError ("bind() failed");
     } 
-
     /* Create the epoll instance for the server */
     int server_fd = epoll_create(1);
     if (server_fd < 0) 
     {
         DieWithError("failed to the created the epoll instance for server");
     } 
-
     /* Register the listening socket to epoll */
     if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
     {
         DieWithError("failed to register server's listening socket to the interest list");
     }          
-
     /* Server's run-to-completion event loop */
     while (!stop) 
     {
@@ -397,12 +398,13 @@ void run_server()
 
         if (nfds > 0)
         {
-            if (data_recieved == 0) /* only print this message once per loop iteration, even if multiple packets are received */
+            /* Only print this message once per loop iteration */
+            if (data_recieved == 0)
             {
                 puts("server has successfully recieved data; responding to client ...");
                 data_recieved = 1; /* do not enter this block again in the current loop iteration */
             }
-
+            /* Recieve all ready packets in one go */
             while((recvMsgSize = recvfrom(UDPSock, recv_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
             {
                 /* Deserialize the packets recieved from the client and reconstruct its data */
@@ -423,7 +425,7 @@ void run_server()
                     DieWithError("sendto() sent a different number of bytes than expected");
                 } 
             }
-
+            /* Something is functionally wrong with the socket */
             if (recvMsgSize < 0 && errno != EAGAIN)
             {
                 DieWithError("recvfrom() failed or connection closed prematurely");
