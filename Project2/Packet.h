@@ -1,7 +1,7 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-#define CLIENT_PACKET_SIZE 34 /* 2 bytes for sequence number + 16 bytes for message + 16 bytes for client buffer */
+#define CLIENT_PACKET_SIZE 36 /* 2 + 2 bytes for base and next sequence number + 16 bytes for message + 16 bytes for client buffer */
 #define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
 #define MESSAGE_SIZE 16 /* fixed message size of 16 bytes */
 
@@ -9,7 +9,8 @@
 
 /* Initialize the struct members with a fixed message size and sequence number array */
 typedef struct {
-    unsigned short seq_num; /* used to hold sequence number of each packet */
+    unsigned short base; /* oldest unacknowledged packet */
+    unsigned short next_seqnum; /* next packet to send */
     char message[MESSAGE_SIZE]; /* send 16 bytes every time */
     char client_buf[MESSAGE_SIZE]; /* used to hold the message recieved by the client */
 } client_struct;
