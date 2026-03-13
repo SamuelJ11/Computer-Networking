@@ -15,7 +15,7 @@
 
 #define MAX_EVENTS 64
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 1000
+#define NUM_REQUESTS 40000
 #define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
