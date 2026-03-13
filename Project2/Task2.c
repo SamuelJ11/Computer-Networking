@@ -19,10 +19,10 @@
 #define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
-int server_port = 12345;
-int num_threads = DEFAULT_CLIENT_THREADS;
-int num_requests = NUM_REQUESTS;
-int pipeline_size = PIPELINE;
+unsigned int server_port = 12345;
+unsigned int num_threads = DEFAULT_CLIENT_THREADS;
+unsigned int num_requests = NUM_REQUESTS;
+unsigned short pipeline_size = PIPELINE;
 
 volatile sig_atomic_t stop = 0; /* used for the signal handler we install later */
 sigset_t sigmask; /* used for the signal mask in epoll_pwait2 */
@@ -57,18 +57,19 @@ void Signal(int signum, sighandler_t handler)
 
 /* This structure is used to store per-thread data in the client */
 typedef struct {
+    unsigned short progress; /* used for tracking the percent completion of each thread */
     int epoll_fd;       /* file descriptor for the epoll instance, used for monitoring events on the socket. */
     int client_fd;      /* file descriptor for the client socket on which data is sent to the server. */
-    long tx_count;       /* accumulated number of sent packets for each thread */
-    long rx_count;       /* accumulated number of recieved packets for each thread */
+    unsigned int retransmission; /* used for tracking the number of retransmissions for each thread */
+    unsigned long tx_count;       /* accumulated number of sent packets for each thread */
+    unsigned long rx_count;       /* accumulated number of recieved packets for each thread */
     unsigned long avg_timeout; /* average timeout interval for each thread (in µs) */
-    unsigned short progress; /* used for tracking the percent completion of each thread */
-} client_thread_data_t;
+} clientthread_metadata;
 
 /* This function runs in a separate client thread to handle communication with the server */ 
 void *client_thread_func(void *arg) 
 {
-    client_thread_data_t *data = (client_thread_data_t *)arg; /* initialize client_thread_data_t struct within the thread */
+    clientthread_metadata *data = (clientthread_metadata *)arg; /* initialize clientthread_metadata struct within the thread */
     calcTimeIntval packetdata; /* initialize calcTimeIntval (packet metadata) struct */
     
     /* Zero out accumulation metrics */
@@ -76,6 +77,7 @@ void *client_thread_func(void *arg)
     data->rx_count = 0;
     data->avg_timeout = 0;
     data->progress = 0;
+    data->retransmission = 0;
 
     /* Zero out timeout metrics, set initial timeout interval to 200 microseconds (µs) */
     memset(&packetdata, 0, sizeof(packetdata)); /* Zero out structure before initializing */
@@ -203,6 +205,9 @@ void *client_thread_func(void *arg)
             packetdata.TimeoutInterval.tv_sec = timeout_µs / 1000000;
             packetdata.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
 
+            /* Update the number of retransmissions for the current packet */
+            data->retransmission++;
+
             /* Go-Back-N: Reset 'i' to the 'base' so the next loop resends the whole window */
             i = client_packet.base;
         }
@@ -231,12 +236,13 @@ collect performance data of each threads, and compute aggregated metrics of all 
 void run_client() 
 {
     pthread_t threads[num_threads];
-    client_thread_data_t thread_data[num_threads];
+    clientthread_metadata thread_data[num_threads];
 
-    int num_threads_created = 0; /* keep track of the number of threads successfully created */
-    long total_packets_sent = 0; /* accumulate the total number of sent packets for each thread */
-    long total_packets_dropped = 0; /* accumulate the total number of dropped packets for each thread */
-    long average_timeout = 0; /* accumulate the average timeout for each thread to compute an overall average timeout across all threads */
+    unsigned int num_threads_created = 0; /* keep track of the number of threads successfully created */
+    unsigned long total_packets_sent = 0; /* accumulate the total number of sent packets for each thread */
+    unsigned long total_packets_dropped = 0; /* accumulate the total number of dropped packets for each thread */
+    unsigned long average_timeout = 0; /* accumulate the average timeout for each thread to compute an overall average timeout across all threads */
+    unsigned long total_retransmissions = 0; /* accumulate the total number of retransmissions for each thread */
 
     /* Create sockets and epoll instances for client threads
     and connect these sockets of client threads to the server */
@@ -273,10 +279,12 @@ void run_client()
         long thread_tx_cnt = thread_data[i].tx_count;
         long thread_rx_cnt = thread_data[i].rx_count;
         long thread_lost_pkt_cnt = thread_tx_cnt - thread_rx_cnt;
+        int thread_retransmissions = thread_data[i].retransmission; 
 
         /* Update accumulators */
         total_packets_sent += thread_tx_cnt;
         total_packets_dropped += thread_lost_pkt_cnt;
+        total_retransmissions += thread_retransmissions;
 
         /* Add guard against floating point exception (division by zero) */
         if (thread_data[i].progress > 0) /* only update average timeout if the thread has sent at least 10% of its messages */
@@ -288,6 +296,7 @@ void run_client()
         printf("Total packets sent: %ld \n", thread_tx_cnt);
         printf("Total packets recieved: %ld \n", thread_rx_cnt);
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
+        printf("Number of retransmissions: %d\n", thread_retransmissions);
         puts("==============================================================");
     }
 
@@ -296,6 +305,7 @@ void run_client()
 
     /* Calculate the loss proportion across all threads */
     float loss_proportion = (float)total_packets_dropped / (float)(total_packets_sent);
+
     printf("Average Packet Loss Rate Across All Threads: %.4f %%\n", loss_proportion*100);
 
     if (average_timeout > 0) /* only print average timeout if all threads have sent at least 10% of their packets */
@@ -307,6 +317,7 @@ void run_client()
         puts("Average Timeout Interval Across all Threads: NA");
     }
 
+    printf("Total Number of Retransmissions Across All Threads: %ld\n", total_retransmissions);
     puts("==============================================================");
     
     /* Close all client sockets */
