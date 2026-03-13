@@ -298,7 +298,7 @@ void run_client()
         /* Print thread results */
         printf("Results For Thread %d: \n\n", i + 1);
         printf("Total packets sent: %ld \n", thread_tx_cnt);
-        printf("Total packets recieved: %ld \n", thread_rx_cnt);
+        printf("Total packets received: %ld \n", thread_rx_cnt);
         printf("Number of packets lost: %ld\n", thread_lost_pkt_cnt);
         printf("Number of retransmissions: %d\n", thread_retransmissions);
         puts("==============================================================");
