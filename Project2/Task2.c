@@ -123,13 +123,16 @@ void *client_thread_func(void *arg)
 
     /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
     int i = 0;
-    while (i < num_requests && !stop) 
+    client_packet.base = 0; /* initialize the oldest unacknowledged packet to 0 */
+
+    while (client_packet.base < num_requests && !stop) 
     {
         /* Use clock_gettime() to start the per-packet-burst timer as it provides nanosecond precision */
         /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
         clock_gettime(CLOCK_MONOTONIC, &packetdata.start);
 
-        for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
+        /* Only send if we are within the window and have requests left */
+        while (i < client_packet.base + pipeline_size && i < num_requests) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
             client_packet.next_seqnum = i;
@@ -157,7 +160,7 @@ void *client_thread_func(void *arg)
         }
 
         /* If timeout exceeds 1000x minimum threshold, something has gone seriously wrong */
-        if (timeout_µs > (100000000 * num_threads * pipeline_size)) 
+        if (timeout_µs > (10000 * num_threads * pipeline_size)) 
         {
             puts("server is overloaded or not responding; maximum timeout exceeded");
             exit(1);
@@ -173,28 +176,17 @@ void *client_thread_func(void *arg)
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeServer(recv_buf, &server_packet);
 
-                /* Something went wrong */
-                if (server_packet.expected_seqnum < client_packet.base)
+                /* Slide the window: the server says it's ready for server_packet.expected_seqnum */
+                /* So everything before that is officially received */
+
+                if (server_packet.expected_seqnum > client_packet.base)
                 {
-                    /* Resend all packets that a base number > expected_seqnum */
-                    char send_buf[CLIENT_PACKET_SIZE];
-                    SerializeClient(&client_packet, send_buf);
-
-                    while (client_packet.base != server_packet.expected_seqnum)
-                    {
-                        if (sendto(data->client_fd, send_buf, CLIENT_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != CLIENT_PACKET_SIZE)
-                        {
-                            DieWithError("sendto() sent a different number of bytes than expected");
-                        }
-
-                        client_packet.base ++; /* increment the client's base number */
-                    }
+                    client_packet.base = server_packet.expected_seqnum;                
                 }
                 
                 /* Update client's next sequence number and receive counts */
                 client_packet.next_seqnum = (server_packet.expected_seqnum + 1);
-
-                data->rx_count++; /* update the number of recieved packets */
+                data->rx_count++;
             }
 
             /* Use clock_gettime() to stop the per-packet-burst timer */
@@ -211,6 +203,9 @@ void *client_thread_func(void *arg)
             /* Update the timespec struct that epoll_pwait2() actually uses */
             packetdata.TimeoutInterval.tv_sec = timeout_µs / 1000000;
             packetdata.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
+
+            /* Go-Back-N: Reset 'i' to the 'base' so the next loop resends the whole window */
+            i = client_packet.base;
         }
         else /* nfds < 0 */
         {
