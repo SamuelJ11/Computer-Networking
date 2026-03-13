@@ -6,12 +6,12 @@
 typedef struct {
     struct timespec start;
     struct timespec end;
+    struct timespec TimeoutInterval; /* this needs to be a struct for epoll_pwait2() */
     double SampleRTT;
     double EstimatedRTT;
     double DevRTT;
     double alpha;
     double beta;
-    struct timespec TimeoutInterval; /* this needs to be a struct for epoll_pwait2() */
 } calcTimeIntval;
 
 void TimeInterval(calcTimeIntval *packetdata);
