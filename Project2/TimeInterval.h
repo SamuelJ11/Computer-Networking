@@ -14,6 +14,6 @@ typedef struct {
     double beta;
 } calcTimeIntval;
 
-void TimeInterval(calcTimeIntval *packetdata);
+void TimeInterval(calcTimeIntval *packettiming);
 
 #endif
