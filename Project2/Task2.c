@@ -55,7 +55,7 @@ void Signal(int signum, sighandler_t handler)
     }
 }
 
-/* This structure is used to store per-thread data in the client */
+/* This structure is used to store per-thread metadata in the client */
 typedef struct {
     unsigned short progress; /* used for tracking the percent completion of each thread */
     int epoll_fd;       /* file descriptor for the epoll instance, used for monitoring events on the socket. */
