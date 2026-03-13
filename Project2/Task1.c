@@ -404,8 +404,8 @@ int main(int argc, char *argv[])
         if (argc > 2) server_ip = argv[2];
         if (argc > 3) server_port = atoi(argv[3]);
         if (argc > 4) num_threads = atoi(argv[4]); /* initialize number of threads (if given), defaults to 4 */
-        if (argc > 5) num_requests = atoi(argv[5]);
-        if (argc > 6) pipeline_size = atoi(argv[6]); /* initialize pipeline size (if given), defaults to 8 */
+        if (argc > 5) num_requests = atoi(argv[5]); /* initialize number of requests (if given), defaults to 1000000 */
+        if (argc > 6) pipeline_size = atoi(argv[6]); /* initialize pipeline size (if given), defaults to 4 */
 
         run_client();
     } 
