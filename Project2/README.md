@@ -4,9 +4,9 @@
 
 This project uses a Makefile which can selectively build targets.
 
-The default target for 'make' is the executable for task 1 (PA2_Task1), so simply running 'make' will build this target (you could also explicitly specifiy the target by running 'make 1' to build PA2_Task1)
+The default target for 'make' is the executable for task 1 (PA2_Task1), so simply running 'make' will build this target (you could also explicitly specify the target by running 'make 1' to build PA2_Task1).
 
-To build the executable for task 2 (PA2_Task2) run 'make 2'
+To build the executable for task 2 (PA2_Task2) run 'make 2'.
 
 While the Makefile handles all dependencies, it is helpful to know that Task 1 depends on the following headers and sources:
 
@@ -22,19 +22,19 @@ And Task 2 depends on the following headers and sources:
     • Packet.c          (implementation for the packet "class" that handles serializing and deserializing structs)
     • Packet.h          (declaration of Packet.c)  
 
-Once both executables have been built, feel free to run 'make clean' to remove unnecesssary object files.
+Once both executables have been built, feel free to run 'make clean' to remove unnecessary object files.
 
 ## 2. Execution
 
 ### Task 1
 
-Task 1 has several optional parameters specified with default values to minimize the number of arguments the user must supply to the program
+Task 1 has several optional parameters specified with default values to minimize the number of arguments the user must supply to the program.
 
 Run the following command on the server:
 
     • ./PA2_Task1 server  
 
-Then in a seperate or split terminal, run the following comand on the client:
+Then in a separate or split terminal, run the following command on the client:
 
     • ./PA2_Task1 client
 
@@ -46,33 +46,33 @@ The following are the default parameters that were implicitly passed:
     • num_requests = 1000000    argv[5]
     • pipeline_size = 4         argv[6]
 
-These values can be changed by running the program with those additional command line arguments modified in that exact order
+These values can be changed by running the program with the additional command-line arguments specified in that exact order.
 
-The output of running the code using the default parameters gives this output on my codespace:
+The output of running the code using the default parameters gives this output on my Codespace:
 
     ==============================================================
     Results For Thread 1: 
 
     Total packets sent: 1000000 
-    Total packets recieved: 999743 
+    Total packets received: 999743 
     Number of packets lost: 257
     ==============================================================
     Results For Thread 2: 
 
     Total packets sent: 1000000 
-    Total packets recieved: 999701 
+    Total packets received: 999701 
     Number of packets lost: 299
     ==============================================================
     Results For Thread 3: 
 
     Total packets sent: 1000000 
-    Total packets recieved: 999508 
+    Total packets received: 999508 
     Number of packets lost: 492
     ==============================================================
     Results For Thread 4: 
 
     Total packets sent: 1000000 
-    Total packets recieved: 999585 
+    Total packets received: 999585 
     Number of packets lost: 415
     ==============================================================
     ==============================================================
@@ -84,7 +84,7 @@ The output of running the code using the default parameters gives this output on
 
 ### Task 2
 
-Task 2 can be run exactly like task 1, and has the optional parameters specified with the following default values:
+Task 2 can be run exactly like Task 1, and has the optional parameters specified with the following default values:
 
     • server_ip = 127.0.0.1     argv[2]
     • server_port = 12345       argv[3]
@@ -92,34 +92,34 @@ Task 2 can be run exactly like task 1, and has the optional parameters specified
     • num_requests = 40000      argv[5]
     • pipeline_size = 4         argv[6]
 
-The output of running the code using the default parameters gives this output on my codespace:
+The output of running the code using the default parameters gives this output on my Codespace:
 
     ==============================================================
     Results For Thread 1: 
 
     Total packets sent: 40044 
-    Total packets recieved: 40044 
+    Total packets received: 40044 
     Number of packets lost: 0
     Number of retransmissions: 44
     ==============================================================
     Results For Thread 2: 
 
     Total packets sent: 40020 
-    Total packets recieved: 40020 
+    Total packets received: 40020 
     Number of packets lost: 0
     Number of retransmissions: 20
     ==============================================================
     Results For Thread 3: 
 
     Total packets sent: 40036 
-    Total packets recieved: 40036 
+    Total packets received: 40036 
     Number of packets lost: 0
     Number of retransmissions: 36
     ==============================================================
     Results For Thread 4: 
 
     Total packets sent: 40028 
-    Total packets recieved: 40028 
+    Total packets received: 40028 
     Number of packets lost: 0
     Number of retransmissions: 28
     ==============================================================
@@ -155,7 +155,7 @@ If Thread 1 sends packets 0, 1, 2, 3 in a burst, then:
                 .
                 .
 
-But, if the ACKs are delayed and the client times out, the client resets its loop sliding window to its base:
+If the ACKs are delayed and the client times out, the client resets its loop sliding window to its base:
 
     • i = client_packet.base;   (in client_thread_func() line 217)
 
@@ -180,7 +180,7 @@ This value had to be set relatively low, otherwise a "runaway" scenario was obse
 
     • while (client_packet.base < num_requests && !stop)
 
-Will always be true and the loop never terminates unless the user interrups the client program (ctrl + c)
+Will always be true and the loop never terminates unless the user interrups the client program (ctrl + c).
 
 I'm not sure if the issue described above is causing this "runaway" behavior or not, and I was not able to debug it in time.
 
