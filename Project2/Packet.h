@@ -5,9 +5,9 @@
 #define SERVER_PACKET_SIZE 18 /* 2 bytes for expected sequence number + 16 bytes for echo buffer */
 #define MESSAGE_SIZE 16 /* fixed message size of 16 bytes */
 
-#include <string.h> /* for memcpy() */
+#include <string.h>
 
-/* Initialize the struct members with a fixed message size and sequence number array */
+/* Initialize the struct members with a fixed message size and struct specific fields */
 typedef struct {
     unsigned short base; /* oldest unacknowledged packet */
     unsigned short next_seqnum; /* next packet to send */
@@ -21,9 +21,9 @@ typedef struct {
 } server_struct;
 
 void SerializeClient(client_struct *packet, char *buf);  /* serialize the client packet struct into a byte stream to send over the network */
-void DeserializeClient(char *buf, client_struct *packet); /* takes the serialized buffer we generated and reconstructs the original packet struct */
-
 void SerializeServer(server_struct *packet, char *buf);  /* serialize the server packet struct into a byte stream to send over the network */
+
+void DeserializeClient(char *buf, client_struct *packet); /* takes the serialized buffer we generated and reconstructs the original packet struct */
 void DeserializeServer(char *buf, server_struct *packet); /* takes the serialized buffer we generated and reconstructs the original packet struct */
 
 #endif
