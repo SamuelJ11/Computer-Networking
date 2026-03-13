@@ -132,7 +132,7 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
-            client_packet.next_seqnum = (i % 1000); /* wraps around after 1000 */
+            client_packet.next_seqnum = i;
             char send_buf[CLIENT_PACKET_SIZE];
             SerializeClient(&client_packet, send_buf); 
 
@@ -192,21 +192,16 @@ void *client_thread_func(void *arg)
                 }
                 
                 /* Update client's next sequence number and receive counts */
-                client_packet.next_seqnum = (server_packet.expected_seqnum + 1) % 1000;
+                client_packet.next_seqnum = (server_packet.expected_seqnum + 1);
 
                 data->rx_count++; /* update the number of recieved packets */
             }
-
-            /* Update the client's base number */
-            client_packet.next_seqnum = client_packet.next_seqnum % 1000;
 
             /* Use clock_gettime() to stop the per-packet-burst timer */
             clock_gettime(CLOCK_MONOTONIC, &packetdata.end);
 
             /* Recalculate the timeout interval using the TimeInterval() function */
             TimeInterval(&packetdata);  
-
-
         }
         else if (nfds == 0) /* timeout (packet loss) */
         {
@@ -415,7 +410,7 @@ void run_server()
                 if (client_packet.next_seqnum == server_packet.expected_seqnum)
                 {
                     /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
-                    server_packet.expected_seqnum = (server_packet.expected_seqnum + 1) % 1000; /* wraps around after 1000 */
+                    server_packet.expected_seqnum++; 
 
                     /* Echo the message back to the client*/
                     memcpy(server_packet.echo_buf, client_packet.message, MESSAGE_SIZE); /* copy the message from the client packet to the server packet's echo buffer */
