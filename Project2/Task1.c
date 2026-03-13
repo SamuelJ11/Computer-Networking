@@ -91,8 +91,10 @@ void *client_thread_func(void *arg)
 
     /* Variables for epoll events, sending/receiving messages, and measuring RTT */
     struct epoll_event ev, events[MAX_EVENTS];
-    char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKMLNOP"; /* Send 16-Bytes message every time */
+    char send_buf[MESSAGE_SIZE] = "ABCDEFGHIJKLMNOP"; /* Send 16-Bytes message every time */
     char recv_buf[MESSAGE_SIZE];
+    int recvMsgSize; /* size of received message */ 
+    int sentMsgSize; /* size of echoed message */
 
     /* Initialize the ev struct for the client and round trip time (RTT) metrics */
     ev.events = EPOLLIN;
@@ -124,7 +126,9 @@ void *client_thread_func(void *arg)
         for (int j = 0; j < pipeline_size && i < num_requests; j++) /* send up to pipeline_size packets before waiting for responses */
         {
             /* Send the message using sendto(), which includes destination arguments */
-            if (sendto(packetdata->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr)) != MESSAGE_SIZE)
+            sentMsgSize = sendto(packetdata->client_fd, send_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ServAddr, sizeof(ServAddr));
+
+            if (sentMsgSize != MESSAGE_SIZE)
             {
                 DieWithError("sendto() sent a different number of bytes than expected");
             }
@@ -153,10 +157,15 @@ void *client_thread_func(void *arg)
     
         if (nfds > 0) /* no time out */
         {
-            while ((recvfrom(packetdata->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
+            while ((recvMsgSize = recvfrom(packetdata->client_fd, recv_buf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
                 /* Update receive counts */
                 packetdata->rx_count++;
+            }
+            /* Something is functionally wrong with the socket */
+            if (recvMsgSize < 0 && errno != EAGAIN)
+            {
+                DieWithError("recvfrom() failed or connection closed prematurely");
             }
             /* Use clock_gettime() to stop the per-packet-burst timer */
             clock_gettime(CLOCK_MONOTONIC, &packettiming.end);
@@ -277,6 +286,7 @@ void run_client()
     
     /* Close all client sockets */
     puts("client is shutting down, closing all thread sockets ...");
+    
     for (int i = 0; i < num_threads_created; i++)
     {
         if (thread_data[i].client_fd > 0) /* socket is open */
@@ -350,7 +360,7 @@ void run_server()
                 data_recieved = 1; /* do not enter this block again in the current loop iteration */
             }
             /* Recieve all ready packets in one go */
-            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) >= 0)
+            while((recvMsgSize = recvfrom(UDPSock, echobuf, MESSAGE_SIZE, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, &clntLen)) > 0)
             {
                 sentMsgSize = sendto(UDPSock, echobuf, recvMsgSize, MSG_DONTWAIT, (struct sockaddr*)&ClntAddr, sizeof(ClntAddr));
 
