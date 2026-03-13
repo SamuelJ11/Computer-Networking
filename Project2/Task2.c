@@ -210,8 +210,8 @@ void *client_thread_func(void *arg)
             packettiming.TimeoutInterval.tv_sec = timeout_µs / 1000000;
             packettiming.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
 
-            /* Update the number of retransmissions for the current packet */
-            packetdata->retransmission++;
+            /* Update the number of retransmissions for the current thread */
+            packetdata->retransmission += (i - client_packet.base); /* 'i' is where we were, 'client_packet.base' is where we are going back to */
 
             /* Go-Back-N: Reset 'i' to the 'base' so the next loop resends the whole window */
             i = client_packet.base;
