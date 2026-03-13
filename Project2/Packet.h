@@ -7,7 +7,7 @@
 
 #include <string.h>
 
-/* Initialize the struct members with a fixed message size and struct specific fields */
+/* Initialize the struct members with a fixed message size and struct-specific fields */
 typedef struct {
     unsigned short base; /* oldest unacknowledged packet */
     unsigned short next_seqnum; /* next packet to send */
