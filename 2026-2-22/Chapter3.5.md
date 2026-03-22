@@ -82,7 +82,7 @@
 
 ## 3.5.3: Round-Trip Time Estimation and Timeout
 
-    • TCP, like the rtt protocol in section 3.4, uses a timeout/retransmit mechanism to recover from lost segments. 
+    • TCP, like the rdt protocol in section 3.4, uses a timeout/retransmit mechanism to recover from lost segments. 
 
         - clearly this timeout should be larger than the connection's RTT . . . but how much longer?
 
@@ -176,9 +176,9 @@
 
     • TCP is smarter than a standard GBN protocol. If you send 5 segments and the first one is lost, a standard GBN would retransmit all 5 segments; TCP does not.
 
-        - TCP usually only retransmits one segment—the one that actually timed out
+        - TCP usually only retransmits one segment — the one that actually timed out
 
-        - While standard GBN throws away out-of-order segments, many TCP implementations buffer them so they don't have to be resent later
+        - while standard GBN throws away out-of-order segments, many TCP implementations buffer them so they don't have to be resent later
 
         -  If the ACK for segment 'n' is lost, but the ACK for 'n + 1' arrives before the timeout, TCP does not retransmit segment 'n'; it realizes that if the receiver got 'n + 1', it must have received 'n' successfully
 
@@ -192,7 +192,7 @@
 
     • TCP provides a flow-control service to its applications to eliminate the possibility of the sender overflowing the receiver’s buffer.
 
-        - not to be confused with congestion contrl
+        - not to be confused with congestion control
 
     • For the discussion that follows, we assume that TCP discards out-of-order segments
 
@@ -216,9 +216,9 @@
             
         - the amount of data currently sitting in the buffer is calculated via (LastByteRcvd - LastByteRead)
         
-        - the yellow box (aka rwnd) is calculated via RcvBuffer - [LastByteRcvd -LastByteRead]
+        - the yellow box (aka rwnd) is calculated via RcvBuffer - [LastByteRcvd - LastByteRead]
         
-        - in other words, the spare room (rwnd) is the total size of the bucket (RcvBuffer) minus the data already sitting in it (LastByteRcvd -LastByteRead)
+        - in other words, the spare room (rwnd) is the total size of the bucket (RcvBuffer) minus the data already sitting in it (LastByteRcvd - LastByteRead)
 
     • Because the spare room changes with time, rwnd is dynamic.
 
@@ -278,6 +278,6 @@
 
     • When the client application process issues a close command, the client TCP sends a special TCP segment with the 'FIN' flag bit set to 1.
 
-        - when the server receives this segment, it sends the client an acknowledgment segment in return. The server then sends its own shutdown segment, which has the FIN bit set to .
+        - when the server receives this segment, it sends the client an acknowledgment segment in return. The server then sends its own shutdown segment, which has the FIN bit set to
 
     • During the life of a TCP connection, the TCP protocol running in each host makes transitions through various TCP states (see figures 3.39 and 3.40)
