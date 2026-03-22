@@ -38,9 +38,9 @@
 
         - in the rightmost state, the sender protocol is waiting for an ACK or a NAK packet from the receiver.  
         
-            (1) if an ACK packetg is recieved, the sender knows that the most recently transmitted packet has been recieved correctly and thus the protocol returns to the state of waiting for data from the upper layer
+            (1) if an ACK packet is recieved, the sender knows that the most recently transmitted packet has been recieved correctly and thus the protocol returns to the state of waiting for data from the upper layer
 
-            (2) if a NAK is recieved, the protocol retransmits the last packet and wiats for an ACK or NAK to be returned by the reciever in response to the retransmitted data packet
+            (2) if a NAK is recieved, the protocol retransmits the last packet and waits for an ACK or NAK to be returned by the reciever in response to the retransmitted data packet
 
     • It is important to note that when the sender is in the wait-for-ACK-or-NAK state, it cannot get more data from the upper layer; that is, the rdt_send() event can not occur; that will happen only after the sender receives an ACK and leaves this state. Thus, the sender will not send a new piece of data until it is sure that the receiver has correctly received the current packet. Because of this behavior, protocols such as rdt2.0 are known as stop-and-wait protocols.
 
@@ -100,15 +100,23 @@
 
     • Implementing a time-based retransmission mechanism requires a countdown timer that can interrupt the sender after a given amount of time has expired.
 
-    • Because packet sequence numbers alternate between  and , protocol  is sometimes known as the alternating-bit protocol.
+    • Because packet sequence numbers alternate between 0 and 1, protocol rdt3.0 is sometimes known as the alternating-bit protocol.
 
 ## 3.4.2: Pipelined Reliable Data Transfer Protocols
 
     • For the stop and wait protocol, the sender had a utilization (the fraction of time the sender is actually busy sending bits into the channel) of only 0.00027
 
-        - That is, the sender was busy only 2.7 hundredths of one percent of the time! 
+        - this value was obtained via the formula for the sender utilization rate:
 
-    • The solution to this particular performance problem is simple: Rather than operate in a stop-and-wait manner, the sender is allowed to send multiple packets without waiting for acknowledgments.
+            Uₛ = (L/R) / (RTT + L/R)   
+
+            * L = 8000 bits
+            * R = 10 Gbps (10⁹ bits per second)
+            * RTT = 30 ms 
+
+        - that is, the sender was busy only 2.7 hundredths of one percent of the time! 
+
+    • The solution to this particular performance problem is simple: rather than operate in a stop-and-wait manner, the sender is allowed to send multiple packets without waiting for acknowledgments.
 
         - this is known as pipelining
 
@@ -126,9 +134,9 @@
 
     • Instead of just "0" and "1", we now have a long line of sequence numbers.
     
-        (1) the Window: this is the bracketed section in the diagram of size 'N'. It represents the maximum number of packets the sender is allowed to have "in flight" (sent but not yet acknowledged).  As soon as the sender receives an ACK for the oldest packet in the window (base), the window "slides" forward to the right, allowing the sender to transmit a brand-new packet
+        (1) the window: this is the bracketed section in the diagram of size 'N'. It represents the maximum number of packets the sender is allowed to have "in flight" (sent but not yet acknowledged).  As soon as the sender receives an ACK for the oldest packet in the window (base), the window "slides" forward to the right, allowing the sender to transmit a brand-new packet
 
-        (2) The Limits of Sequence Numbers: the range of sequence numbers for packets that have been sent but aren't yet acknowledged is restricted to this window size.  This provides flow control and congestion control
+        (2) the limits of sequence numbers: the range of sequence numbers for packets that have been sent but aren't yet acknowledged is restricted to this window size.  This provides flow control and congestion control
 
     • If 'k' is the number of bits in the packet sequence number field (in the packet header), then the range of sequence numbers is this [0, 2ᵏ - 1]
     
@@ -155,7 +163,7 @@
 
 ## 3.4.4: Selective Repeat (SR)
 
-    • There are scenarios in which GBN itself suffers from performance problems; in particular, when the window size and bandwidth-delay product are both large, many packets can be in the pipeline. 
+    • There are scenarios in which GBN itself suffers from performance problems; in particular, when the window size and bandwidth-delay product (R . RTT) are both large, many packets can be in the pipeline. 
     
         - a single packet error can thus cause GBN to retransmit a large number of packets, many unnecessarily if they have been correctly received but are out-of-order and thus buffered at the receiver
 
@@ -174,9 +182,9 @@
         (1) the receiver got a packet and moved its base forward
         (2) the reciever sent an ACK back
         (3) crucially, the ACK that was previously sent hasn't arrived at the sender yet
-        (4) because of (3), the sender's send_base is "stuck" in th past until that signal arrives
+        (4) because of (3), the sender's send_base is "stuck" in the past until that signal arrives
 
-    • It is important to note that in Step 2 in Figure 3.25, the receiver reacknowledges (rather than ignores) already received packets with certain sequence numbers below the current window base; the necessity of this can be illustrated by the fact that of the receiver were not to acknowledge this packet, the sender’s window would never move forward!
+    • It is important to note that in Step 2 in Figure 3.25, the receiver reacknowledges (rather than ignores) already received packets with certain sequence numbers below the current window base; the necessity of this can be illustrated by the fact that if the receiver were not to acknowledge this packet, the sender’s window would never move forward!
 
     • When data travels over a network rather than a single wire, packets can be reordered or "buffered" by the network and delivered much later than expected. 
     

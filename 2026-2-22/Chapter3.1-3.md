@@ -116,7 +116,7 @@
 
     • At the reciever, all four 16-bit words are added, including the checksum; if no errors are introduced into the packet, the sum at the reciever will be 1111111111111111
 
-        - if one of the  bits is a zero, then we know that errors have ben introeduced into the packet
+        - if one of the bits is a zero, then we know that errors have ben introduced into the packet
 
     • Why does UDP bother with error-checking?
     
