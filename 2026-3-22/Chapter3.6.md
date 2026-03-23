@@ -85,3 +85,19 @@
         - the longer the path (the more "hops"), the worse this problem gets
   
         - in a 10-hop path, if a packet drops at hop 10, you’ve wasted the resources of 9 different links
+
+    • Now we see that the need for some form of congestion control is clear, and a path’s bottleneck link plays an important role in congestion control;
+
+        - the goal then is for this congestion control mechanism is for the 'N' connections (figure 3.47) to set their transport layer’s sending rates so that their aggregate sending rate is close to, but does not exceed, the bottleneck link capacity
+  
+  ## 3.6.2: End-to-end and Network-assisted Approaches to Congestion Control
+
+    • Here, we identify the two broad approaches to congestion control that are taken in practice and discuss specific network architectures and congestion-control protocols embodying these approaches;
+
+        (1) end-to-end congestion control: the network layer provides no explicit support to the transport layer for congestion-control purposes (TCP takes this end-to-end approach toward congestion control, since the IP layer is not required to provide feedback to hosts regarding network congestion)
+
+        (2) network-assisted congestion control: routers provide explicit feedback to the sender and/or receiver regarding the congestion state of the network
+
+            - one form of this notification typically takes the form of a choke packet (essentially saying, “I’m congested!”) 
+             
+            - the second and more common form of notification occurs when a router marks/updates a field in a packet flowing from sender to receiver to indicate congestion; upon receipt of a marked packet, the receiver then notifies the sender of the congestion indication
