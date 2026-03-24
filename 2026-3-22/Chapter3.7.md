@@ -141,6 +141,45 @@
         average TCP connection throughput = 0.75W/RTT
 
 ## 3.7.2: Recent End-End TCP Congestion Control Algorithms
+
+    • The “classic” TCP congestion control algorithms that we studied in the last section have largely been replaced by the newer flavors of TCP congestion control (in particular, BBR, and before that TCP CUBIC)
+
+### TCP CUBIC: improving on additive increase
+
+    • TCP CUBIC differs only slightly from TCP Reno:
     
+        - once again, the congestion window is increased only on ACK receipt, but CUBIC changes the congestion avoidance phase, as follows:
+
+        (1) let 'Wₘₐₓ' be the size of TCP’s congestion control window when loss was last detected, and let 'K' be the future point in time when TCP CUBIC's window size will again reach Wₘₐₓ
+
+        (2) CUBIC TCP increases the congestion window as a function of the cube of the distance between the current time 't' and 'K'; when 't' is further away from 'K', the congestion window size increases are much larger than when it's close to 'K'
+
+        (3) when 't' exceeds 'K', the congestion window increases rapidly to allow CUBIC to more quickly find a new operating point if the congestion level of the link that caused loss has changed significantly
+
+        * see figure 3.52 to see how CUBIC enjoys a higher overall throughput than Reno
+
+### BBR: Bottleneck Bandwidth and Round-trip propagation time
+
+    • The BBR (Bottleneck Bandwidth and RTT) congestion-control protocol is based on the insight of "keeping the pipe full, but not fuller".
+
+        - let Nₚᵢₚₑ be the number of packets "in the pipe" or in flight
+
+        - if our goal is to "keep the pipe just full" then its important to realize that a longer RTT pipe is able to hold more packets
+
+        - as the path’s link capacities increase, it can hold more in-flight packets; we think of "long, fat pipes" as connections with large-bandwidth links and a large RTTs
+
+        - this gives rise to the notion of the "bandwidth-delay product" as an approximation for the average amount of in-flight data that connections can support without loss
+  
+    • Think of the bandwidth-delay product as the exact moment the pipe is 100% full; with this in mind we reference figure 3.53:
+
+        (1) initially, when 'Nₚᵢₚₑ' increases, the connections’ throughput also increases
+
+        (2) when the amount of in-flight data reaches the connection's bandwidth-delay product, the pipe is “just full enough.” 
+
+        (3) increasing 'Nₚᵢₚₑ' beyond the bandwidth-delay product not only won’t increase throughput, but actaully increases RTT due to the increased queueing delay at the bottleneck link
+
+    • Given these considerations, the point at which 'Nₚᵢₚₑ' equals the bandwidth-delay product can be considered an “ideal” operating point.
+
+## 3.7.3: Network-Assisted Explicit Congestion Notification
     
 
