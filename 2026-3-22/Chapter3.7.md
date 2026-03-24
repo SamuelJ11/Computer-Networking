@@ -182,4 +182,44 @@
 
 ## 3.7.3: Network-Assisted Explicit Congestion Notification
     
+    • The previous approaches took an end-to-end approach towards congestion control in that they used observations at the TCP sender of packet loss, RTT, and achieved throughput to perform congestion control.
 
+    • Extensions to both IP and TCP [RFC 3168] have been proposed, implemented, and deployed, collectively known as "Explicit Congestion Notification (ECN)", that allow the network to explicitly signal congestion to a TCP sender and receiver.
+
+        - in the IP datagram header, two bits (for which there are two settings) in the Type of Service field are used for this:
+  
+        (1) one setting is used by a router to indicate that it is experiencing congestion, and this bit can be set before loss actually occurs
+
+        (2) a second setting is used by the sending host to inform routers that the sender and reciever are ECN-capable
+
+        * see figure 3.54 for a clearer example of this
+  
+## 3.7.4: Fairness
+
+    • Consider 'K' TCP connections, each with a different end-to-end path and taking a loss-based AIMD approach toward congestion control.
+
+        - each of these connections pass through a bottleneck link with transmission rate R bytes/sec
+
+    • A congestion-control mechanism is said to be "fair" if the average transmission rate of each connection is approximately R/K.
+
+    • When referencing figure 3.54, ignore the slow-start phase of TCP and assume the TCP connections are operating in CA mode (AIMD) at all times.
+
+        - looking at figure 3.55 now, the goal is to have the achieved throughputs fall somewhere near the intersection of the equal capacity share line and the full utilization line
+  
+    • In the previous idealized scenario, we assumed that only TCP connections traverse the bottleneck link, that the connections have the same RTT value, and that only a single TCP connection is associated with a host-destination pair.
+
+        - in reality, when multiple connections share a common bottleneck, those sessions with a smaller RTT are able to grab the available capacity at that link more quickly as it becomes free
+
+### Fairness and UDP
+
+    • When running over UDP, applications can pump their audio and video into the network at a constant rate and occasionally lose packets, rather than reduce their rates to “fair” levels at times of congestion and not lose any packets.
+
+    • Because TCP congestion control will decrease its transmission rate in the face of increasing congestion (loss), while UDP sources need not, it is possible for UDP sources to crowd out TCP traffic.
+
+### Fairness and Parallel TCP Connections
+
+    • Even if we could force UDP traffic to behave fairly, the fairness problem would still not be completely solved:
+
+        - nothings stops TCP-based applications from using multiple parallel connections
+
+    • Web browsers often use multiple parallel TCP connections to transfer the multiple objects within a Web page.
