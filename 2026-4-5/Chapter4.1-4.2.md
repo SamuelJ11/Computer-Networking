@@ -79,3 +79,51 @@
     • While the data plane operates at the nanosecond time scale, a router’s control functions operate at the millisecond or second timescale.
 
 ## 4.2.1: Input Port Processing and Destination-Based Forwarding
+
+    • Referencing figure 4.5, the input port has three main functions/blocks:
+
+        (1) line termination: handles the electrical/optical signal coming in (conversts bits on the wire to usable data)
+
+        (2) link-layer processing: handles frame parsing, error detection and removing the link-layer header (converts link-layer frames to network layer datagrams)
+
+        (3) lookup + forwarding: examines the IP header and does a forwarding table lookup (decides which output port to send the packet to)
+
+    • A line card is a full hardware board (like a circuit board) inside the router, and contains:
+
+        (1) multiple ports
+
+        (2) input port logic
+
+        (3) memory for forwarding table copies
+
+        (4) hardware for fast packet processing
+
+    • The routing processor computes the forwarding table, sends it over PCI bus to the line cards which then keep their own local forwarding table copies
+
+    • With such a shadow copy at each line card, forwarding decisions can be made locally, at each input port, without invoking the centralized routing processor on a per-packet basis and thus avoiding a centralized processing bottleneck.
+
+    • In SDN, the router’s routing processor is either minimized or doesn’t run routing protocols—the SDN controller computes the forwarding table and installs it into the router.
+
+        - router processor simply talks to the remote controller, clear separation between control and data plane
+  
+    • Let's now consider how incoming packets are switched to thier corresponding output ports:
+
+        - suppose our router has four links, numbered 0 - 3, and that packets are to be forwarded to the link interface as follows:
+
+        +----------------------------+---------------+
+        |          Prefix            | Link Interface|
+        +----------------------------+---------------+
+        | 11001000 00010111 00010    |       0       |
+        +----------------------------+---------------+
+        | 11001000 00010111 00011000 |       1       |
+        +----------------------------+---------------+
+        | 11001000 00010111 00011    |       2       |
+        +----------------------------+---------------+
+        | Otherwise                  |       3       |
+        +----------------------------+---------------+
+
+        - with this style of forwarding table, the router matches a prefix of the packet’s destination address with the entries in the table; if there’s a match, the router forwards the packet to a link associated with the match
+
+        - e.g., if the packets destination address is 11001000 00010111 00010110 10100001, then router forwards teh packet to link interface 0
+
+    • When there are multiple matches, the router uses the longest prefix matching rule.
