@@ -127,3 +127,122 @@
         - e.g., if the packets destination address is 11001000 00010111 00010110 10100001, then router forwards teh packet to link interface 0
 
     • When there are multiple matches, the router uses the longest prefix matching rule.
+
+    • At Gigabit transmission rates, this lookup must be performed in nanoseconds.
+    
+        - in practice, Ternary Content Addressable Memories (TCAMs) are often used for address lookup
+  
+        - since TCAMs are expensive and have high energy consumption, hybrid approaches that combine static random-access memory (SRAM) memories have also been proposed, along with purely “algorithmic” approaches to lookup
+
+## 4.2.2: Switching
+
+    • The switching fabric is at the very heart of a router, as it is through this fabric that the packets are actually switched (that is, forwarded) from an input port to an output port.
+
+    • Switching can be accomplished in a number of ways (see figure 4.6):
+
+        (1) switching via memory: in traditional routers, the packed was copied from the input port into processor memory, then the routing processor then extracted the destination address from the header, looked up the appropriate output port in the forwarding table, and copied the packet to the output port’s buffers. modern routers that use this method have the memory copying and forward table lookup done via the input port line cards
+
+        (2) switching via a bus: this is done by having the input port pre-pend a switch-internal label (header) to the packet indicating the local output port to which this packet is being transferred and transmitting the packet onto the bus. all output ports receive the packet, but only the port that matches the label will keep the packet. the label is then removed at the output port.  because every packet must cross the single bus, the switching speed of the router is limited to the bus speed
+
+        (3) switching via an interconnection network: one way to overcome the bandwidth limitation of the previous methods is to use a crossbar switch, an interconnection network consisting of 2N buses that connect N input ports to N output ports.  unlike the previous two switching approaches, crossbar switches are capable of forwarding multiple packets in parallel. a crossbar switch is non-blocking — a packet being forwarded to an output port will not be blocked from reaching that output port as long as no other packet is currently being forwarded to that output port
+
+## 4.2.3: Output Port Processing
+
+    • This involves taking packets that have been stored in the output port’s memory and transmitting them over the output link (see figure 4.7).
+
+## 4.2.4: Where Does Queuing Occur?
+
+    • Recall that in our earlier discussions, we said that packets were “lost within the network” or “dropped at a router.”
+    
+        - it is here, at these input and output queues within a router, where such packets are actually dropped and lost
+
+    • If the switching fabric is N times faster than the input/output line rate, it can move packets from inputs to outputs faster than they arrive, preventing significant queuing at the input ports. Even in the worst-case scenario where all input packets target the same output, the fabric can clear one full batch of packets before the next batch arrives.
+
+### Input Queuing
+
+    • See figure 4.8 for an illustration of Head of Line Blocking in an input-queued switch.
+
+### Output Queueing
+
+    • Imagine a switch with 4 input ports and 1 output port (N = 4):
+    
+        (1) arrival: 4 packets arrive simultaneously, one at each input port.
+        
+        (2) internal transfer: because the switch is 4 times faster than the lines, it can grab all 4 of those packets and shove them toward the single output port in the time it takes the output port to send just one packet
+        
+        (3) the accumulation: while the output port is busy transmitting packet #1 onto the wire, packets #2, #3, and #4 have already arrived and are sitting there waiting  
+        
+        (4) the cycle continues: by the time the output port finishes packet #1 and starts packet #2, 4 more packets might have arrived from the inputs.
+        
+        (5) the result: packet loss because packets are arriving at the output port faster than they can be sent out, meaning they have to stay in a buffer (memory) which eventually overflows
+
+### How Much Buffering Is “Enough?”
+
+    • For many years, the rule of thumb for buffer sizing was that the amount of buffering 'B' should be equal to an average round-trip time 'R' (in ms) times the link capacity 'C' (in bits/s) such that B = R * C
+
+    • More recent theoretical and experimental efforts suggest that when a large number of independent TCP flows N pass through a link, this equation gets updated to B = R * (C / sqrt(N))
+
+        - this is seen in core networks with many TCP flows
+  
+    • To understand "bufferbloat" from figure 4.10, consider this scenario:
+
+        Phase 1: The Initial Burst (t = 0)
+        - burst: the gamer’s PC sends 25 packets to the home router all at once.
+        - router queue: 25 packets now sitting in the buffer.
+        - bottleneck: the internet connection can only send 1 packet every 20 ms.
+
+        Phase 2: The "Silent" Period (t = 0 to t = 200 ms)
+        - first packet in transit: the very first packet is traveling to the server; no ACKs have returned yet.
+        - router draining: the router starts transmitting packets one by one.
+        - timeline:
+            - t = 0 ms → Packet 1 starts sending.
+            - t = 20 ms → Packet 2 starts sending.
+            - t = 40 ms → Packet 3 starts sending.
+            - t = 60 ms → Packet 4 starts sending.
+            - t = 80 ms → Packet 5 starts sending.
+            - t = 100 ms → Packet 6 starts sending.
+            - t = 120 ms → Packet 7 starts sending.
+            - t = 140 ms → Packet 8 starts sending.
+            - t = 160 ms → Packet 9 starts sending.
+            - t = 180 ms → Packet 10 starts sending.
+            - t = 200 ms → 10 packets have been sent; the router is starting Packet 11.
+
+        Phase 3: The ACK Arrival (t = 200 ms)
+        - RTT: the first packet sent at t = 0 finally reaches the server, and its ACK arrives back at the PC.
+        - ACK clocking: the PC sees the ACK for Packet 1 and thinks there’s space to send the next packet.
+        - new packet sent: the PC sends Packet 26 to the router.
+
+        Phase 4: The Persistent Queue
+        - queue state: original packets remaining = 25 − 10 = 15 (Packets 11–25).
+        - new arrivals: for every 20 ms, one ACK arrives, prompting the PC to send one new packet.
+        - packets leaving: router sends one packet every 20 ms.
+        - balance: one in = one out. The queue stays at 15 packets indefinitely.
+        - consequence: even though the router is sending at full line speed, it can never clear the initial burst because new packets arrive at the exact same rate it drains the queue.
+
+    • The above scenario illustrates that not only is throughput important, but also minimal delay is important as well.
+
+## 4.2.5: Packet Scheduling
+
+### First-in-First-Out (FIFO)
+
+    • The FIFO (also known as first-come-first-served, or FCFS) scheduling discipline selects packets for link transmission in the same order in which they arrived at the output link queue.
+
+        - see figure 4.12 for the FIFO queue in operation
+
+### Priority Queuing
+  
+    • Under priority queuing, packets arriving at the output link are classified into priority classes upon arrival at the queue (see figure 4.13).
+
+        - the choice among packets in the same priority class is typically done in a FIFO manner
+
+        - - see figure 4.14 for the priority queue in operation
+
+### Round Robin and Weighted Fair Queuing (WFQ)
+
+    • Under the round robin queuing discipline, packets are sorted into classes as with priority queuing. 
+    
+        - however, rather than there being a strict service priority among classes, a round robin scheduler alternates service among the classes
+
+    • A work-conserving round robin discipline that looks for a packet of a given class but finds none will immediately check the next class in the round robin sequence (see figure 4.15).
+
+    • A generalized form of round robin queuing that has been widely implemented in routers is the so-called weighted fair queuing (WFQ) discipline (see figure 4.16) and the paragraph that follows, its pretty straightforward.
