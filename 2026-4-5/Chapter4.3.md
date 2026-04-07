@@ -31,3 +31,7 @@
         (11) data (payload): in most circumstances, the data field of the IP datagram contains the transport-layer segment (TCP or UDP) to be delivered to the destination
 
     • Note that an IP datagram has a total of 20 bytes of header (assuming no options); If the datagram carries a TCP segment, then each datagram carries a total of 40 bytes of header (20 bytes of IP header plus 20 bytes of TCP header) along with the application-layer message.
+
+        - when an IP datagram carries a TCP segment, the TCP header is inside the IP datagram’s data portion
+
+## 4.3.2: IPV4 Addressing
