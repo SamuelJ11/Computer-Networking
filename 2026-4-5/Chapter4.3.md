@@ -129,4 +129,46 @@
 
     • DHCP is a client-server protocol: in the simplest case, each subnet (in the addressing sense of Figure 4.20) will have a DHCP server:
 
-        - if no server is present on the subnet, a DHCP relay agent (typically a router) that knows the address of a DHCP server for that network is needed.
+        - if no server is present on the subnet, a DHCP relay agent (typically a router) that knows the address of a DHCP server for that network is needed
+
+    • For a newly arriving host, the DHCP protocol is a four step process (as outlined in figure 4.24):
+
+        (1) the client sends out a DHCP discover message within a UPD packet to port 67, which is encapulated within an IP datagram and has the broadcast destination IP address of 255.255.255.255 with a "this host" source address of 0.0.0.0. the link layer then broadcasts this frame to all nodes attached to the subnet
+
+        (2) a DHCP server receiving a DHCP discover message responds to the client with a DHCP offer message that is broadcast to all nodes on the subnet, again using the IP broadcast address of 255.255.255.255.  each server offer message contains the transaction ID of the received discover message, the proposed IP address for the client, the network mask, and an IP address lease time.
+
+        (3) the newly arriving client will choose from among one or more server offers and respond to its selected offer with a DHCP request message, echoing back the configuration parameters
+
+        (4) the server responds to the DCHP request message with a DHCP ACK message, confirming the requested parameters
+
+    • Once the client recieves the DHCP ACK, the interaction is complete and the client can use the DHCP-allocated IP address for the lease duration
+
+## 4.3.3: Network Address Translation (NAT)
+
+    • The address space 10.0.0.0/8 is one of the three portions of the IP address space that is reserved for a private network (these are networks whose addresses only have meaning to devices within that network)
+
+    • Consider the fact that there are hundreds of thousands of home networks, many using the same address space 10.0.0.0/24
+
+        - devices within a given home network can send packets to each other using 10.0.0.0/24 addressing
+
+        - however, packets forwarded beyond the home network into the larger global Internet clearly cannot use these addresses (as either a source or a destination address) because there are hundreds of thousands of networks using this block of addresses
+
+    • In figure 4.25, after understanding the basics of NAT, its important to note that the router gets its address from the ISP’s DHCP server, and the router runs a DHCP server to provide addresses to computers within the NAT-DHCP-router-controlled home network’s address space.
+
+        - since all datagrams arriving at the NAT router from the WAN have the same destination IP address, the router uses a NAT translation table and includes port numbers as well as IP addresses in the table entries to determine to which internal host to forward a given datagram
+
+    • Because of IPv4 address exhaustion, rather than assign public addresses to all of these home NAT routers, your home router itself gets a private IP from the ISP:
+
+        - this is called Carrier-Grade NAT (basically double-layered NAT)
+
+        - ISPs are reserved a special chunck of private IP addresses to do this (100.64.0.0/10)
+
+        - this was done to avoid the case of a first hop home/enterprise NAT and an ISP NAT choosing to use overlapping private IP address spaces
+
+    • If a host inside your network (private IP, e.g., 192.168.1.100) wants to reach another host on the internet, NAT automatically tracks the outgoing connection.
+
+        - but if some external host initiates a connection to a host within your private network, NAT doesn't know which internal device to send the packet to because it wasn't initiated from within your network
+
+        - this means port forwarding is required to manually tell the router "Packets arriving on this public IP + port should go to this internal IP + port"
+
+## 4.3.4: IPV6
