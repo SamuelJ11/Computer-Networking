@@ -245,4 +245,4 @@
 
     • A work-conserving round robin discipline that looks for a packet of a given class but finds none will immediately check the next class in the round robin sequence (see figure 4.15).
 
-    • A generalized form of round robin queuing that has been widely implemented in routers is the so-called weighted fair queuing (WFQ) discipline (see figure 4.16) and the paragraph that follows, its pretty straightforward.
+    • A generalized form of round robin queuing that has been widely implemented in routers is the so-called weighted fair queuing (WFQ) discipline (see figure 4.16 and the paragraph that follows, its pretty straightforward).
