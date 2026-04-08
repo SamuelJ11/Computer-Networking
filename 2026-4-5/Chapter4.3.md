@@ -35,3 +35,98 @@
         - when an IP datagram carries a TCP segment, the TCP header is inside the IP datagram’s data portion
 
 ## 4.3.2: IPV4 Addressing
+
+    • Just to clear up some terminology before we begin, the boundary between the host and the physical link is called an interface.
+
+    • Because every host and router is capable of sending and receiving IP datagrams, IP requires each host and router interface to have its own IP address:
+    
+        - thus, an IP address is technically associated with an interface, rather than with the host or router containing that interface.
+  
+    • Each IP address is 32 bits long (equivalently, 4 bytes), and there are thus a total of 2³² (or approximately 4 billion) possible IP addresses.
+
+    • These addresses are typically written in so-called dotted-decimal notation, in which each byte of the address is written in its decimal form and is separated by a period.
+
+        - e.g., 192.32.216.9 has the binary representation as
+
+            11000001 00100000 11011000 00001001
+
+    • Each interface on every host and router in the global Internet must have an IP address that is globally unique:
+
+        - a portion of an interface’s IP address will be determined by the subnet to which it is connected
+
+    • A network interconnecting multiple host interfaces and one router interface is called a subnet.
+
+        - IP addressing assigns an address to this subnet, for example:
+
+            223.1.1.0/24 (where /24 is the subnet mask) indicates that the leftmost 24 bits of the 32-bit address define the subnet address
+
+    • For a general interconnected system of routers and hosts, we can use the following recipe to define the subnets in the system:
+
+        - to determine the subnets, detach each interface from its host or router, creating islands of isolated networks, with interfaces terminating the end points of the isolated networks 
+         
+        - each of these isolated networks is called a subnet
+
+    • The Internet’s address assignment strategy is known as Classless Interdomain Routing (CIDR)
+
+        - CIDR generalizes the notion of subnet addressing
+  
+    • As with subnet addressing, the 32-bit IP address is divided into two parts and again has the dotted-decimal form a.b.c.d/x where x indicates the number of bits in the first part of the address:
+
+        - mathematically speaking, subnetting is a restricted version of CIDR that operates on fixed network classes (A, B, and C)
+        
+        - the 'x' most significant bits of an address constitute the network portion of the IP address (often referred to as the "prefix" of the address)
+
+        - only these 'x' leading prefix bits are considered by routers outside the organization's network, considerably reducing the size of the forwarding tables in these routers
+
+        - the remaining (32 - x) bits of an address can be thought of as distinguishing among the devices within a network (all of which share the same network prefix)
+         
+    • Before CIDR was adopted, the network portions of an IP address were constrained to be 8, 16 or 24 bits in length, an addressing scheme known as classful addressing, since subnets with 8, 16, and 24 subnet addresses were known as class A, B, and C networks, respectively.
+
+    • When a host sends a datagram with destination address 255.255.255.255 the message is delivered to all hosts on the same subnet. Routers optionally forward the message into neighboring subnets as well (although they usually don’t).
+
+### Obtaining a Block of Addresses
+
+    • In order to obtain a block of IP addresses for use within an organization’s subnet, a network administrator might first contact its ISP, which would provide addresses from a larger block of addresses that had already been allocated to the ISP. 
+    
+        - for example, the ISP may itself have been allocated the address block 200.23.16.0/20, and he ISP, in turn, could divide its address block into eight equal-sized contiguous address blocks (200.23.16.0/23) and give one of these address blocks out to each of up to eight organizations that are supported by this ISP
+  
+        +----------------+-----------------+------------------------------------------+
+        | ISP's block:   | 200.23.16.0/20  | 11001000 00010111 00010000 00000000      |
+        |                |                 | -------- -------- ----                   |
+        +----------------+-----------------+------------------------------------------+
+        | Organization 0 | 200.23.16.0/23  | 11001000 00010111 00010000 00000000      |
+        |                |                 | -------- -------- -------                |
+        +----------------+-----------------+------------------------------------------+
+        | Organization 1 | 200.23.18.0/23  | 11001000 00010111 00010010 00000000      |
+        |                |                 | -------- -------- -------                |
+        +----------------+-----------------+------------------------------------------+
+        | Organization 2 | 200.23.20.0/23  | 11001000 00010111 00010100 00000000      |
+        |                |                 | -------- -------- -------                |
+        +----------------+-----------------+------------------------------------------+
+        |      ...       |                 |                   ...                    |
+        +----------------+-----------------+------------------------------------------+
+        | Organization 7 | 200.23.30.0/23  | 11001000 00010111 00011110 00000000      |
+        |                |                 | -------- -------- -------                |
+        +----------------+-----------------+------------------------------------------+
+
+        - as you can see, each organization gets 2⁸ = 512 usable host addresses from the /23 subnet mask
+
+    • IP addresses are managed under the authority of the Internet Corporation for Assigned Names and Numbers (ICANN).
+
+    • The role of the nonprofit ICANN organization is not only to allocate IP addresses, but also to manage the DNS root servers:
+
+        - the ICANN also allocates addresses to regional Internet registries (for example, ARIN, RIPE, APNIC, and LACNIC, which together form the Address Supporting Organization of ICANN), and handle the allocation/management of addresses within their regions
+
+### Obtaining a Host Address: The Dynamic Host Configuration Protocol
+
+    • Once an organization has obtained a block of addresses, it can assign individual IP addresses to the host and router interfaces in its organization.
+
+        - while a sys/network administrator will typically manually configure IP addresses into the router, host addresses may be configured automatically via DHCP
+
+        - in addition to host IP address assignment, DHCP also allows a host to learn additional information, such as its subnet mask, the address of its first-hop router (often called the default gateway), and the address of its local DNS server
+
+    • Because of DHCP’s ability to automate the network-related aspects of connecting a host into a network, it is often referred to as a plug-and-play or zeroconf (zero-configuration) protocol.
+
+    • DHCP is a client-server protocol: in the simplest case, each subnet (in the addressing sense of Figure 4.20) will have a DHCP server:
+
+        - if no server is present on the subnet, a DHCP relay agent (typically a router) that knows the address of a DHCP server for that network is needed.
