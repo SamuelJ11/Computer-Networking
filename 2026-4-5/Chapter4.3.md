@@ -172,3 +172,19 @@
         - this means port forwarding is required to manually tell the router "Packets arriving on this public IP + port should go to this internal IP + port"
 
 ## 4.3.4: IPV6
+
+### IPV6 Datagram Format
+
+    • IPv6 increases the size of the IP address from 32 to 128 bits.
+
+    • IPv6 has introduced a new type of address, called an anycast address, that allows a datagram to be delivered to any one of a group of hosts.
+
+    • Additionally, the 40-byte fixed-length header allows for faster processing of the IP datagram by a router.
+
+    • IPv6 introduced flow labeling to mark packets that belong to a specific flow (a group of packets that need special handling):
+
+        - this lets routers or switches recognize and handle them differently, without examining each packet’s full contents
+
+### Transitioning from IPV4 to IPV6
+
+    • The approach to IPv4 - IPv6 transition that has been most widely adopted in practice involves tunneling (encapsulating an IPv6 datagram within an IPv4 datagram).
