@@ -16,7 +16,7 @@
 
         - in the context of networking, the nodes in the graph represent routers, and the edges are the physical links between them
 
-    • When we study the BGP inter-domain routing protocol, we’ll see that nodes represent networks, and the edge connecting two such nodes represents direction connectivity (know as peering) between the two networks.
+    • When we study the Border Gateway Protocol (BGP) inter-domain routing protocol, we’ll see that nodes represent networks, and the edge connecting two such nodes represents direction connectivity (know as peering) between the two networks.
 
     • Referencing figure 5.3, an edge also has a value representing its cost; typically the physical length of the corresponding link;
 
