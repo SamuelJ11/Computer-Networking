@@ -15,7 +15,7 @@
 
 #define MAX_EVENTS 64
 #define DEFAULT_CLIENT_THREADS 4
-#define NUM_REQUESTS 40000
+#define NUM_REQUESTS 10000
 #define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
@@ -125,21 +125,17 @@ void *client_thread_func(void *arg)
     struct sockaddr_in fromAddr;
     socklen_t fromLen = sizeof(fromAddr);
 
-    /* Initialize the master loop control variable that represents the number of requests processed */
-    int i = 0;
-
     /* Client thread sends messsages to the server and waits for a potential timeout before sending next packet */
     while (client_packet.base < num_requests && !stop) 
     {
-        /* Use clock_gettime() to start the per-packet-burst timer as it provides nanosecond precision */
+        /* Use clock_gettime() to start the client_packet.base timer as it provides nanosecond precision */
         /* Since the timespec struct is inside the packetdata struct, we pass the address of that field */
         clock_gettime(CLOCK_MONOTONIC, &packettiming.start);
 
-        /* Only send if we are within the window and have requests left */
-        while (i < client_packet.base + pipeline_size && i < num_requests) 
+        /* Only send the appropriate packets if we are within the window */
+        while (client_packet.next_seqnum < client_packet.base + pipeline_size && client_packet.next_seqnum < num_requests)
         {
-            /* Assign the appropriate sequence number and serialize the packet into a byte stream for sending */
-            client_packet.next_seqnum = i;
+            /* Serialize the packet into a byte stream for sending */
             char send_buf[CLIENT_PACKET_SIZE];
             SerializeClient(&client_packet, send_buf); 
 
@@ -152,12 +148,12 @@ void *client_thread_func(void *arg)
             }
 
             packetdata->tx_count++; /* update the number of sent packets */
-            i++; /* update the master loop control variable */
+            client_packet.next_seqnum ++; /* update the sequence number of the client */
         }
         /* Calculate the timeout in microseconds, updates with each iteration */
         timeout_µs = (packettiming.TimeoutInterval.tv_sec * 1000000) + (packettiming.TimeoutInterval.tv_nsec / 1000);
 
-        /* Reset timeout to a minimum of 10 µs to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
+        /* Reset timeout to a set minimum to avoid a potential infinite loop of timeouts if the TimeoutInterval becomes too small */
         if (timeout_µs < (10 * num_threads * pipeline_size))
         {
             /* Restore timeout and update the timespec struct that epoll_pwait2() actually uses */
@@ -195,7 +191,7 @@ void *client_thread_func(void *arg)
             {
                 DieWithError("recvfrom() failed or connection closed prematurely");
             }
-            /* Use clock_gettime() to stop the per-packet-burst timer */
+            /* Use clock_gettime() to stop the base packet timer */
             clock_gettime(CLOCK_MONOTONIC, &packettiming.end);
 
             /* Recalculate the timeout interval using the TimeInterval() function */
@@ -211,17 +207,17 @@ void *client_thread_func(void *arg)
             packettiming.TimeoutInterval.tv_nsec = (timeout_µs % 1000000) * 1000;
 
             /* Update the number of retransmissions for the current thread */
-            packetdata->retransmission += (i - client_packet.base); /* 'i' is where we were, 'client_packet.base' is where we are going back to */
+            packetdata->retransmission += (client_packet.next_seqnum - client_packet.base); /* 'client_packet.next_seqnum' is where we were, 'client_packet.base' is where we are going back to */
 
-            /* Go-Back-N: Reset 'i' to the 'base' so the next loop resends the whole window */
-            i = client_packet.base;
+            /* Go-Back-N: Reset 'client_packet.next_seqnum' to the 'base' so the next loop resends the whole window */
+            client_packet.next_seqnum = client_packet.base;
         }
         else /* nfds < 0 */
         {
             DieWithError("epoll_pwait2() failed");
         }
         /* Update the average timeout for every 10% of messages sent */
-        if (i > 0 && i % (NUM_REQUESTS / 10) == 0)
+        if (client_packet.next_seqnum > 0 && client_packet.next_seqnum % (NUM_REQUESTS / 10) == 0)
         {
             /* Add microsecond timeout values for the accumulation metrics in runclient() */
             packetdata->avg_timeout += (timeout_µs);
@@ -314,11 +310,11 @@ void run_client()
 
     if (average_timeout > 0) /* only print average timeout if all threads have sent at least 10% of their packets */
     {
-        printf("Average Timeout Interval Across all Threads: %.2ld µs\n", average_timeout / num_threads_created);
+        printf("Average Timeout Interval Across All Threads: %.2ld µs\n", average_timeout / num_threads_created);
     }
     else
     {
-        puts("Average Timeout Interval Across all Threads: NA");
+        puts("Average Timeout Interval Across All Threads: NA");
     }
 
     printf("Total Number of Retransmissions Across All Threads: %ld\n", total_retransmissions);
