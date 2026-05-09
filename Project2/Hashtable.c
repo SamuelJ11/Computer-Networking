@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "Task2.c"
+#include "Task2.h"
 
 #define MAX_ID 32
 #define TABLE_SIZE (10 * CLIENT_THREADS)
