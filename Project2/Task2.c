@@ -91,9 +91,8 @@ void *client_thread_func(void *arg)
     int sentMsgSize; /* size of echoed message */
 
     /* Declare a client and server packet struct that will hold the packet payload and header (control) information */
-    server_struct server_packet; /* this struct is only used for sending packets back to the server */
-    client_struct client_packet; /* this struct is only used for deserializing packets from the client */
-
+    server_struct server_packet; /* this struct is only used for deserializing packets from the server */
+    client_struct client_packet; /* this struct is used for serializing packets to be sent to the server */
     /* Zero out the client packet struct before initializing */
     memset(&client_packet, 0, CLIENT_PACKET_SIZE); 
     
@@ -258,7 +257,7 @@ void run_client()
         /* Pass the thread_data to pthread_create() */   
         pthread_create(&threads[i], NULL, client_thread_func, &thread_data[i]);
 
-        /* Update the number of threads actually created and loop control variable*/
+        /* Update the number of threads actually created and loop control variable */
         num_threads_created++;
         i++;
     }
