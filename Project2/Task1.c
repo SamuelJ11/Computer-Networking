@@ -10,13 +10,7 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "TimeInterval.h"
-
-#define MAX_EVENTS 64
-#define MESSAGE_SIZE 16
-#define CLIENT_THREADS 4
-#define NUM_REQUESTS 1000000
-#define PIPELINE 4
+#include "Task1.h"
 
 char *server_ip = "127.0.0.1";
 unsigned int server_port = 12345;
