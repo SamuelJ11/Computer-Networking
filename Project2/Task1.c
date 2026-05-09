@@ -14,13 +14,13 @@
 
 #define MAX_EVENTS 64
 #define MESSAGE_SIZE 16
-#define DEFAULT_CLIENT_THREADS 4
+#define CLIENT_THREADS 4
 #define NUM_REQUESTS 1000000
 #define PIPELINE 4
 
 char *server_ip = "127.0.0.1";
 unsigned int server_port = 12345;
-unsigned int num_threads = DEFAULT_CLIENT_THREADS;
+unsigned int num_threads = CLIENT_THREADS;
 unsigned int num_requests = NUM_REQUESTS;
 unsigned short pipeline_size = PIPELINE;
 
