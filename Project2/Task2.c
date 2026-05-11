@@ -11,6 +11,7 @@
 #include <signal.h>
 
 #include "Task2.h"
+#include "Hash.h"
 
 char *server_ip = "127.0.0.1";
 unsigned int server_port = 12345;
@@ -166,7 +167,7 @@ void *client_thread_func(void *arg)
         {
             while ((recvMsgSize = recvfrom(packetdata->client_fd, recv_buf, SERVER_PACKET_SIZE, MSG_DONTWAIT, (struct sockaddr *)&fromAddr, &fromLen)) > 0) 
             {
-                /* Deserialize the packets recieved from the client and reconstruct its data */
+                /* Deserialize the packets recieved from the server and reconstruct its data */
                 DeserializeServer(recv_buf, &server_packet);
 
                 /* Slide the window: the server says it's ready for server_packet.expected_seqnum */
@@ -175,7 +176,8 @@ void *client_thread_func(void *arg)
                 if (server_packet.expected_seqnum > client_packet.base)
                 {
                     client_packet.base = server_packet.expected_seqnum;                
-                }                
+                }
+
                 /* Update client's next sequence number and receive counts */
                 packetdata->rx_count++;
             }
@@ -378,7 +380,7 @@ void run_server()
     if (epoll_ctl(server_fd, EPOLL_CTL_ADD, UDPSock, &ev) < 0) 
     {
         DieWithError("failed to register server's listening socket to the interest list");
-    }          
+    }  
     /* Server's run-to-completion event loop */
     while (!stop) 
     {
@@ -399,10 +401,30 @@ void run_server()
                 /* Deserialize the packets recieved from the client and reconstruct its data */
                 DeserializeClient(recv_buf, &client_packet); 
 
-                /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
-                server_packet.expected_seqnum = client_packet.next_seqnum + 1;
+                /* Build the client's hash key */
+                char key[64];
+                snprintf(key, sizeof(key), "%s:%d", inet_ntoa(ClntAddr.sin_addr), ntohs(ClntAddr.sin_port));
+                client_state *cs = hash_table_lookup(key);
 
-                /* Echo the message back to the client*/
+                /* Create a hash table entry for the client if necessary */
+                if (cs == NULL)
+                {
+                    cs = malloc(sizeof(client_state));
+                    memset(cs, 0, sizeof(client_state));
+
+                    strcpy(cs->client_id, key);
+                    hash_table_insert(cs);
+                }
+
+                /* If the server's expected sequence number matches the sequence number of the client, increment it */ 
+                if (client_packet.next_seqnum == cs->expected_seq_num)
+                {
+                    /* Update the server's expected sequence number to be the next sequence number in the client's sequence number space */
+                    cs->expected_seq_num ++; /* this is effectively an acknowledgement */
+                }
+                
+                server_packet.expected_seqnum = cs->expected_seq_num;
+
                 memcpy(server_packet.echo_buf, client_packet.message, MESSAGE_SIZE); /* copy the message from the client packet to the server packet's echo buffer */
                 char echo_buf[SERVER_PACKET_SIZE];
 
@@ -414,11 +436,13 @@ void run_server()
                     DieWithError("sendto() sent a different number of bytes than expected");
                 } 
             }
+
             /* Something is functionally wrong with the socket */
             if (recvMsgSize < 0 && errno != EAGAIN)
             {
                 DieWithError("recvfrom() failed or connection closed prematurely");
             }
+
         }
         else if (nfds < 0 && !stop) /* if epoll_wait() returns an error other than being interrupted by a signal */
         {
