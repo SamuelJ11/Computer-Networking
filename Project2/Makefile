@@ -6,9 +6,9 @@ TASK1_OBJECTS = $(TASK1_SOURCES:.c=.o)
 TASK1_HEADERS = TimeInterval.h Task1.h
 TASK1_EXEC = PA2_Task1
 
-TASK2_SOURCES = Task2.c Packet.c TimeInterval.c
+TASK2_SOURCES = Task2.c Packet.c TimeInterval.c Hash.c
 TASK2_OBJECTS = $(TASK2_SOURCES:.c=.o)
-TASK2_HEADERS = Packet.h Task2.h
+TASK2_HEADERS = Packet.h Task2.h Hash.h
 TASK2_EXEC = PA2_Task2
 
 default: 1
