@@ -1,5 +1,4 @@
 #include "Packet.h"
-#include <string.h>
 
 void SerializeClient(client_struct *packet, char *buf)
 {
