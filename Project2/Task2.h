@@ -6,7 +6,7 @@
 
 #define MAX_EVENTS 64
 #define CLIENT_THREADS 4
-#define NUM_REQUESTS 10000
+#define NUM_REQUESTS 40000
 #define PIPELINE 4
 
 #endif
