@@ -1,4 +1,4 @@
-# 6.2: Error-Detection and -Correction Techniques
+# 6.2: Error Detection and Correction Techniques
 
     • An important clarification that must be made is that error detection and correction techniques allow the receiver to sometimes, but not always, detect that bit errors have occurred.
 
