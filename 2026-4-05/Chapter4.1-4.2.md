@@ -106,7 +106,7 @@
 
         - router processor simply talks to the remote controller, clear separation between control and data plane
   
-    • Let's now consider how incoming packets are switched to thier corresponding output ports:
+    • Let's now consider how incoming packets are switched to their corresponding output ports:
 
         - suppose our router has four links, numbered 0 - 3, and that packets are to be forwarded to the link interface as follows:
 
