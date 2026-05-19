@@ -31,3 +31,85 @@
       -  in which case the sending adapter insersts a special MAC broadcast address into the destination address field of the frame (this is donated as FF-FF-FF-FF-FF-FF)
 
 ### Address Resolution Protocol (ARP)
+
+    • Because there are both network-layer addresses and link-layer addresses, there is a need to translate between them. 
+
+        - for the Internet, this is the job of the Address Resolution Protocol (ARP)
+
+    • Lets consider an example to kick off our discussion of ARP:
+
+        - suppose a host with IP address 222.222.222.220 wants to send an IP datagram to host 222.222.222.222
+
+        - to send a datagram, the source must give its adapter not only the IP datagram but also the MAC address for the destination; but how does the sending host determine this MAC address? Enter ARP ...
+
+        - an ARP module in the sending host takes an IP address on the same LAN (subnet) as input and returns the corresponding MAC address
+
+    • Now lets discuss how ARP actually works:
+
+        - each host and router has an ARP table in its memory, which contains mappings of IP addresses to MAC addresses (see the ARP table below):
+
+            +-----------------+-------------------+----------+
+            |   IP Address    |    MAC Address    |   TTL    |
+            +-----------------+-------------------+----------+
+            | 222.222.222.221 | 88-B2-2F-54-1A-0F | 13:45:00 |
+            | 222.222.222.223 | 5C-66-AB-90-75-B1 | 13:52:00 |
+            +-----------------+-------------------+----------+
+
+        * this is an example of what an ARP table in host 222.222.222.220 might look like
+        * a typical expiration time for an entry is 20 minutes from when an entry is placed in an ARP table
+
+        - now suppose that the same host wants to send a datagram that is IP-addressed to another host or router on that subnet, lets say to host 222.222.222.222
+
+        - since this host does not have an entry in the ARP table, so the sender contructs an ARP packet, which has several fields including teh sending and recieving IP and MAC addresses
+
+        - this ARP query packet is passed to the adapter long with an indication that the adapter should send the packet to the MAC broadcast address, namely FF-FF-FF-FF-FF-FF
+
+        - the frame containing the ARP query is received by all the other adapters on the subnet, and (because of the broadcast address) each adapter passes the ARP packet within the frame up to its ARP module
+
+        * each of these ARP modules checks to see if its IP address matches the destination IP address in the ARP packet, and the one with a match sends back to the querying host a response ARP packet with the desired mapping
+
+    • Interestingly, the query ARP message is sent within a broadcast frame, whereas the response ARP message is sent within a standard frame.
+
+### Sending a Datagram off the Subnet
+
+    • The question that now remains is how a sender can send a network-layer datagram to a host off the subnet.
+
+    • Referencing figure 6.19 we see that all interfaces connected to subnet 1 have addresses of the form 111.111.111.xxx and for subnet 2 it's 222.222.222.xxx:
+
+        - if host 111.111.111.111 wants to send an IP datagram to host 222.222.222.222 by using the MAC address of the destination host, then none of the adapters on subnet 1 would bother to pass it up to the network layer since the frame’s destination address would not match the MAC address of any adapter on subnet 1
+
+        - the correct procedure is to actually send the datagram from host 111.111.111.111 to the router interface for that subnet, which has a MAC address of E6-E9-00-17-BB-4B
+
+        * of courese the sending host obtains the MAC address for 111.111.111.110 (router's network address) via ARP!
+
+        - for the datagram to go from the router to subnet 2, the router now has to determine the correct interface on which the datagram is to be forwarded
+
+        * as discussed in chapter 4.2.1, this is done by consulting a forwarding table in the router:
+
+            +----------------------------+---------------+
+            |          Prefix            | Link Interface|
+            +----------------------------+---------------+
+            | 11001000 00010111 00010    |       0       |
+            +----------------------------+---------------+
+            | 11001000 00010111 00011000 |       1       |
+            +----------------------------+---------------+
+            | 11001000 00010111 00011    |       2       |
+            +----------------------------+---------------+
+            | Otherwise                  |       3       |
+            +----------------------------+---------------+
+
+            example forwarding table from section 4.2.1 
+
+        - now the destination MAC address of the frame is indeed the MAC address of the ultimate destination. And how does the router obtain this destination MAC address? From ARP, of course!
+
+## 6.4.2: Ethernet
+
+    • 
+
+
+
+        
+
+
+
+        
