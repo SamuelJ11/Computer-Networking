@@ -104,8 +104,71 @@
 
 ## 6.4.2: Ethernet
 
-    • 
+### Ethernet Frame Structure
 
+    • Below is the copied figure 6.17 of an ethernet frame:
+
+        +-----------+---------------+---------------+-----------+-----------------------+-----------+
+        | Preamble  | Dest. address | Source address|   Type    |         Data          |    CRC    |
+        +-----------+---------------+---------------+-----------+-----------------------+-----------+
+        |  8 Bytes  |    6 Bytes    |    6 Bytes    |  2 Bytes  |   46 to 1500 Bytes    |  4 Bytes  |
+        +-----------+---------------+---------------+-----------+-----------------------+-----------+
+                                                                \_______________________/
+                                                                            |
+                                                                Contains Layer 3 IP payload
+
+    • From the figure, we note several important facts:
+
+        (1) the maximum transmission unit (MTU) of Ethernet is 1500 bytes. if the IP datagram is less than 46 bytes, the data field has to be "stuffed" to fill out the 46 bytes. 
+
+            * for example, recall the IPv4 Header diagram from figure 4.17:
+
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |Version| Header|Type of service|    Datagram length (bytes)      |
+            |       | length|               |                                 |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |       16-bit Identifier       |Flags|13-bit Fragmentation offset|
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |  Time-to-live |  Upper-layer  |        Header checksum          |
+            |               |    protocol   |                                 |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |                     32-bit Source IP address                    |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |                  32-bit Destination IP address                  |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |                        Options (if any)                         |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            |                                                                 |
+            |                              Data                               |
+            |                                                                 |
+            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+            * let's say the at the application layer, the payload is 20 bytes
+            * recall from section 3.5 that the transport layer (assuming we're using TCP) has an additional 20-byte header (recall from section 3.3 that if this were UDP, the header would only be 8 bytes)
+            * at the network layer, right before IP hands anything to the Ethernet hardware, the IP software looks at the chunk it is holding. it counts the bytes: 20 bytes of TCP header + 20 bytes of application data = 40 bytes
+            * the IP software adds its own 20-byte IP header to the front. inside that IP header, at the exact spot reserved for "Datagram length", the sender's OS explicitly writes the binary for the number 40
+            * now, the IP layer hands this 60-byte block down to the physical Ethernet card. the Ethernet card has a strict hardware rule: "the data field I am handed must be at least 46 bytes long." it looks at the PAYLOAD (NOT the IP header "Datagram Length" field) and sees it's only 40 bytes
+            * the ethernet card blindly appends 6 bytes of zero padding to the very end of the payload so it satisfies the physical wire requirements
+            * in the recieving IP layer, because the sender explicitly wrote 40 in the "Datagram Length" field, the receiver reads it and says: "the sender told me the payload inside this packet is exactly 40 bytes."
+            * the receiver measures out exactly 40 bytes right after the IP header, and it completely ignores the 6 bytes of garbage padding (stuffing) left over at the end
+
+        (2) the destination address contains the MAC address of the destination adapter
+
+        (3) the source address contains the MAC address of the adapter that transmits the frame onto the LAN
+
+        (4) the type field permits Ethernet to multiplex network-layer protocols (IP, AppleTalk, Novell IPX, ARP); analogous to the protocol field in the network layer datagram
+
+        (5) the cyclic redundancy check field (discussed in section 6.2) exits to allow the recieving adapter to detect bit errors in the frame
+
+        (6) the preamble's first seven bytes for ethernet have a value of 10101010 and serve to "wake up" the recieving adapters and to ynchronize their clocks to that of the sender’s clock; the last byte is 10101011 (the last two bits of the eighth byte of the preamble alerts the recieving adapter that the "important stuff" is about to come)
+
+    • Ethernet technologies provide an unreliable service to the network layer.
+
+        - this lack of reliable transport (at the link layer) helps to make Ethernet simple and cheap, but it also means that the stream of datagrams passed to the network layer can have gaps (lets hope TCP is being used at the reciever's transport layer!)
+
+## 6.4.3: Link-Layer Switches
+
+    • 
 
 
         
