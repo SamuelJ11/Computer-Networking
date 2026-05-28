@@ -90,4 +90,26 @@
 
 ## 6.7.3: Still Getting Started: Intra-Domain Routing to the DNS Server
 
+    • Continuing to generalize upon the example given from figure 6.34, we observe that now the DNS request needs to go from the school's gateway router to the ISP's edge router
+
+        (18) the school's gateway router recieves the frame and extracts the IP datagram containing the DNS query
+
+            * the router looks up the destination address of this datagram (DNS server address) and determines from its forwarding table that it should be sent to the ISP's edge router
+            * the IP datagram is placed inside a link-layer frame appropriate for the link connecting the school’s router to the ISP's edge router and is sent over the link
+
+        (19) the ISP's edge router recieves the frame, extracts the IP datagram, and examines the datagrams destination address
+
+            * because the DNS server resides outside the ISP’s local network, the edge router relies on the Border Gateway Protocol (BGP) to learn which external neighboring network (Autonomous System) holds the path to that destination IP. BGP identifies the ultimate exit point or "next-hop" router outside or at the perimeter of the ISP network
+            * simultaneously, the ISP's internal routing tables have been mapped by an intra-domain protocol—such as OSPF or IS-IS; this protocol calculates the shortest internal path (using Dijkstra’s least-cost path algorithm) to reach that BGP-designated exit point
+   
+        (20) eventually the IP datagram containing the DNS query arrives at the DNS server
+
+            * the DNS server extracts the DNS query message, lookus up the name www.google.com and finds the DNS resource record that contains the IP address  for www.google.com (assuming that it's currently cached in the DNS server, which originally was obtained from the authoritative DNS server)
+            * the DNS server forms a DNS reply message containing this hostname-to-IP-address mapping and places it in a UDP segment, which is then encapsulated within an IP datagram destined for your laptop's IP address
+            * the datagram is forwarded back through your ISP's network to the school's router and from there via the ethernet switch to your laptop
+
+        (21) your laptop extracts the IP address of the server www.google.com from the DNS message and finally is now ready to contact the www.google.com server!
+
+## 6.7.4: Web Client-Server Interaction: TCP and HTTP
+
     • 
