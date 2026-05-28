@@ -60,4 +60,34 @@
 
 ## 6.7.2: Still Getting Started: DNS and ARP
 
+    • At this stage, your laptop needs to know the IP address of www.google.com so that your broswer can open a TCP socket to send the HTTP request to www.google.com
+
+        - we learned in section 2.5 that the DNS protocol is used to provide this name-to-IP-address translation service
+
+        (12) your laptop's OS creates a DNS query message by putting the string "www.google.com" in the question section of the DNS message (see section 2.4.3 for a refresher on DNS query/reply message structure)
+
+            * this DNS message is then placed within a UDP segment witha destination port of 53 (DNS server)
+            * since the DHCP OFFER and the DHCP ACK messages returned the IP address of the DNS server AND the assigned the laptop's IP address itself, the UPD segment is placed within an IP datagram with an IP destination of [DNS SERVER ADDRESS] and source IP address of [YOUR LAPTOP'S IP ADDRESS]
+
+        (13) your IP datagram is then encapsulated into an ethernet frame and addressed to the gateway router in your school's network
+
+            * recall the gateway IP was also obtained from the DHCP OFFER and the DHCP ACK messages
+            * but there's a problem; we still dont have the MAC address of the gateway router, so your laptop has to use the ARP protocol
+
+        (14) your laptop creates an ARP REQUEST message with a target IP of [GATEWAY ROUTER IP] and places the ARP message within an Ethernet frame with a broadcast destination address (FF.FF.FF.FF.FF.FF)
+
+        (15) the gateway router receives the frame containing the ARP query message on the interface to the school network, and since the gateway's router IP address matches the destination IP address in the ARP packet, it prepares an ARP REPLY
+
+            * it places the ARP reply message in an Ethernet frame, with a destination address of [YOUR LAPTOPS MAC ADDRESS] and sends the frame to the switch, which delivers the frame to your laptop
+
+        (16) your laptop extracts the MAC address of the gateway router from the ARP REPLY message
+
+        (17) you can (finally!) address the Ethernet frame containing the DNS query to the gateway router’s MAC address
+
+            * note that the destination IP address of the IP datagram is that of the DNS server, but the destination MAC address of the Ethernet frame is that of the gateway router
+            * your laptop sends the frame to the switch, which delivers the frame to the gateway router
+
+
+## 6.7.3: Still Getting Started: Intra-Domain Routing to the DNS Server
+
     • 
