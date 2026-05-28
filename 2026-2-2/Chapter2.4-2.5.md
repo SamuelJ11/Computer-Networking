@@ -104,7 +104,53 @@
 
 ### DNS Messages
 
-    • See figure 2.19 and the following description for an overview of DNS queries and replies
+    • Below is figure 2.19 copied and the following description for an overview of DNS queries and replies:
+
+        +------------------------------------+------------------------------------+
+        |                                    |                                    | \
+        |           Identification           |               Flags                | |
+        |                                    |                                    | |
+        +------------------------------------+------------------------------------+ |
+        |                                    |                                    | |
+        |        Number of questions         |        Number of answer RRs        | | 12 bytes
+        |                                    |                                    | | header
+        +------------------------------------+------------------------------------+ |
+        |                                    |                                    | |
+        |       Number of authority RRs      |      Number of additional RRs      | |
+        |                                    |                                    | /
+        +------------------------------------+------------------------------------+
+        |                                                                         | \
+        |                                Questions                                | | Name, type fields
+        |                     (variable number of questions)                      | | for a query
+        |                                                                         | /
+        +-------------------------------------------------------------------------+
+        |                                                                         | \
+        |                                 Answers                                 | | RRs in response
+        |                (variable number of resource records)                    | | to query
+        |                                                                         | /
+        +-------------------------------------------------------------------------+
+        |                                                                         | \
+        |                                Authority                                | | Records for
+        |                (variable number of resource records)                    | | authoritative servers
+        |                                                                         | /
+        +-------------------------------------------------------------------------+
+        |                                                                         | \
+        |                         Additional information                          | | Additional "helpful"
+        |                (variable number of resource records)                    | | info that may be used
+        |                                                                         | /
+        +-------------------------------------------------------------------------+
+
+        * the first 12 bytes is the header section; the first field is a 16-bit number that identifies the query, and there are a number of flag fields
+        * a 1-bit query/reply flag indicates whether the message is a query (0) or a reply (1)
+        * an authoritative flag is set in a reply message when a DNS server is an authoritative server for a queried name
+        * a 1-bit recursion desired flag is set when a client (host or DNS server) desires that the DNS server perform recursion when it doesn’t have the record
+        * A 1-bit recursion-available field is set in a reply if the DNS server supports recursion
+        * there are also four number-of fields that indicate the number of occurrences of the four types of data sections that follow the header
+
+        * the question section includes (1) a name field that contains the name that is being queried, and (2) a type field that indicates the type of question being asked about the name (e.g., a host address associated with a name (Type A) or the mail server for a name (Type MX))
+        * in a reply from a DNS server, the answer section contains potentially multilple resource records for the name that was originally queried; recall that resource records are four-tuples that contain the the (Name, Value, Type, TTL) (see the above section if unclear)
+        * the authority section contains records of other authoritative servers
+        * the additional section contains other helpful records (e.g., the answer field in a reply to an MX query contains a resource record providing the canonical hostname of a mail server)
 
 ### Inserting Records into the DNS Database
 
