@@ -6,7 +6,7 @@
 
     • Suppose you are on campus and you connect an ethernet cable to the CS department's switch, which is connected to a router which is connected to the ISP.
 
-        - here we assume the ISP is Comcast, and the DNS server resides in the ISP's network
+        - here we assume the DNS server resides in the ISP's network
 
         - we also assume the DHCP server is running within the router (as is often the case)
 
@@ -87,7 +87,6 @@
             * note that the destination IP address of the IP datagram is that of the DNS server, but the destination MAC address of the Ethernet frame is that of the gateway router
             * your laptop sends the frame to the switch, which delivers the frame to the gateway router
 
-
 ## 6.7.3: Still Getting Started: Intra-Domain Routing to the DNS Server
 
     • Continuing to generalize upon the example given from figure 6.34, we observe that now the DNS request needs to go from the school's gateway router to the ISP's edge router
@@ -99,8 +98,8 @@
 
         (19) the ISP's edge router recieves the frame, extracts the IP datagram, and examines the datagrams destination address
 
-            * because the DNS server resides outside the ISP’s local network, the edge router relies on the Border Gateway Protocol (BGP) to learn which external neighboring network (Autonomous System) holds the path to that destination IP. BGP identifies the ultimate exit point or "next-hop" router outside or at the perimeter of the ISP network
-            * simultaneously, the ISP's internal routing tables have been mapped by an intra-domain protocol—such as OSPF or IS-IS; this protocol calculates the shortest internal path (using Dijkstra’s least-cost path algorithm) to reach that BGP-designated exit point
+            * because the DNS server resides inside the ISP’s own network, the edge router does not need external protocols like BGP
+            * instead, the ISP's internal routing tables have been mapped by an intra-domain protocol—such as OSPF or IS-IS; this protocol calculates the shortest internal path (using Dijkstra’s least-cost path algorithm) to reach the DNS server
    
         (20) eventually the IP datagram containing the DNS query arrives at the DNS server
 
