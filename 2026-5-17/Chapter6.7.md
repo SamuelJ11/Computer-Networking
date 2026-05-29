@@ -111,4 +111,57 @@
 
 ## 6.7.4: Web Client-Server Interaction: TCP and HTTP
 
-    • 
+    • Now that your laptop has the IP address of www.google.com, it can create the TCP socket that will be used to send the HTTP GET message to www.google.com.
+
+        (22) first, your laptop's operating system creates a TCP socket and performs a TCP three-way handshake with the TCP/IP stack of the Google server
+
+            * your laptop creates a TCP SYN segment with destination port 80 (for HTTP), places the TCP segment inside an IP datagram with a destination of [GOOGLE'S WEB SERVER IP ADDRESS] (which was obtained via DNS) and places the datagram inside a frame with a destination MAC of [GATEWAY ROUTER'S MAC ADDRESS] (which was obtained via ARP)
+            * this frame is then sent to the switch
+
+        (23) the routers in the school network, the ISP's network, and Google’s network forward the datagram containing the TCP SYN toward www.google.com, using the forwarding table in each router
+
+            * recall that the router forwarding table entries governing forwarding of packets over the inter-domain link between the ISP and Google networks are determined by the BGP protocol 
+
+        (24) eventually, the datagram containing the TCP SYN arrives at www.google.com
+
+            * the TCP SYN message is extracted from the datagram and demultiplexed to the welcome socket associated with port 80
+            * a connection socket is created for the TCP connection between the Google HTTP server and your laptop
+            * a TCP SYNACK segment is generated, placed inside a datagram addressed to your laptop, and finally placed inside a link-layer frame appropriate for the link connecting www.google.com to its first-hop router
+
+        (25) the datagram containing the TCP SYNACK segment is forwarded through the Google, ISP and school networks, eventually arriving at the Ethernet controller (NIC) in your laptop
+
+            * the OS demultiplexes the incoming datagram to the specific TCP socket created in step 22, completing the handshake and establishing an active, ready-to-use connection
+            * note that the final ACK packet rarely travels across the internet completely empty, instead the OS combines them: the final ACK flag and your actual HTTP GET request text are stuffed into the exact same physical packet
+
+        (26) with the socket on your laptop now ready to send bytes to www.google.com, your browser creates the HTTP GET message containing the URL to be fetched:
+
+            * note that we are assuming that we are using HTTP/1.1 or HTTP/2, not HTTP/3 which uses UDP as the underlying transport layer protocol
+            * recall the format of an HTTP request message:
+
+                GET /somedir/page.html HTTP/1.1
+                HOST: www.google.com
+                Connection: (close|open)
+                User-agent: Mozilla/5.0
+                Accept-language: fr
+
+            * the "Connection" header line is the browser (aka User-agent) telling the server that it either does (open) or does not (close) want to bother with persistent connections
+
+            * the HTTP GET message is then written into the socket, with the GET message becoming the payload of a TCP segment
+            * the TCP segment is placed in a datagram and sent and delivered to www.google.com
+
+        (27) now the HTTP server at www.google.com reads the HTTP GET message from the TCP socket, creates an HTTP response message, places the requested Web page content in the body of the HTTP response message, and sends the message into the TCP socket:
+
+            * recall the format of an HTTP response message:
+
+            HTTP/1.1 200 OK
+            Connection: close
+            Date: Mon, 21 Oct 2024 18:58:21 GMT
+            Server: Apache/2.2.3 (CentOS)
+            Last-Modified: Sun, 20 Oct 2024 13:20:46 GMT
+            Content-Length: 6821
+            Content-Type: text/html
+                (data data data data data data . . .)
+
+        (28) the datagram containing the HTTP reply message is forwarded through the Google, ISP, and school networks, and arrives at your laptop
+
+            * your Web browser program reads the HTTP response from the socket, extracts the html for the Web page from the body of the HTTP response, and finally (finally!) displays the Web page!
