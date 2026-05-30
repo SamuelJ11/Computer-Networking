@@ -2,6 +2,28 @@
 
 ## 4.3.1: IPV4 Datagram Format
 
+    • Copied below is figure 4.17 showing the IPv4 header structure:
+
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |Version| Header|Type of service|    Datagram length (bytes)      |
+        |       | length|               |                                 |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |       16-bit Identifier       |Flags|13-bit Fragmentation offset|
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |  Time-to-live |  Upper-layer  |        Header checksum          |
+        |               |    protocol   |                                 |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                     32-bit Source IP address                    |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                  32-bit Destination IP address                  |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                        Options (if any)                         |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                                                                 |
+        |                              Data                               |
+        |                                                                 |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
     • The key fields in the IPv4 datagram are the following:
 
         (1) version number: these 4 bits specify the IP protocol version of the datagram (IPv4 vs IPv6, for example).
