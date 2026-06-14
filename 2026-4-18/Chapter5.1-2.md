@@ -179,7 +179,7 @@
 
     • In the distributed, asynchronous algorithm, from time to time, each node sends a copy of its distance vector to each of its neighbors:
 
-        - when a node 'x' receives a new distance vector from any of its neighbors 'w', it saves w's distance vector, and then uses the Bellman-Ford equation to update its own distance vector
+        - when a node 'x' receives a new distance vector from any of its neighbors 'v', it saves v's distance vector, and then uses the Bellman-Ford equation to update its own distance vector
   
             dₓ(y) = minᵥ{c(x, v) + dᵥ(y)}   for each node 'y' in 'N'
 
