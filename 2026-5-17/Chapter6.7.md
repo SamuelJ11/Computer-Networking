@@ -47,7 +47,7 @@
             * because the switch is self-learning and previously received an Ethernet frame (containing the DHCP DISCOVER request) from your laptop, the switch knows to forward a frame addressed to only to the output port leading to your laptop (68) ... HOWEVER, if the router (DHCP server) chooses to send the DHCP OFFER as a Layer 2 broadcast (FF:FF:FF:FF:FF:FF), the switch must flood it out of every port, rendering its self-learned MAC table useless for that specific frame
             * your laptop receives the frame and multiplexes up the stack using the exact same logic the router used earlier in step (6)
 
-        (9) now the client sends a broadcast DHCP request message following the same steps as (2) - (7)
+        (9) now the client sends a broadcast DHCP REQUEST message following the same steps as (2) - (7)
 
             * the reason DHCP REQUEST is often still broadcast is not because the client doesn’t know the server's address
             * it’s because DHCP is designed so that all DHCP servers on the subnet can see which offer the client accepted
