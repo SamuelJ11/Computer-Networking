@@ -143,14 +143,14 @@
             |                                                                 |
             +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-            * let's say the at the application layer, the payload is 20 bytes
+            * let's say the at the application layer, the payload is 4 bytes
             * recall from section 3.5 that the transport layer (assuming we're using TCP) has an additional 20-byte header (recall from section 3.3 that if this were UDP, the header would only be 8 bytes)
-            * at the network layer, right before IP hands anything to the Ethernet hardware, the IP software looks at the chunk it is holding. it counts the bytes: 20 bytes of TCP header + 20 bytes of application data = 40 bytes
-            * the IP software adds its own 20-byte IP header to the front. inside that IP header, at the exact spot reserved for "Datagram length", the sender's OS explicitly writes the binary for the number 40
-            * now, the IP layer hands this 60-byte block down to the physical Ethernet card. the Ethernet card has a strict hardware rule: "the data field I am handed must be at least 46 bytes long." it looks at the PAYLOAD (NOT the IP header "Datagram Length" field) and sees it's only 40 bytes
-            * the ethernet card blindly appends 6 bytes of zero padding to the very end of the payload so it satisfies the physical wire requirements
-            * in the recieving IP layer, because the sender explicitly wrote 40 in the "Datagram Length" field, the receiver reads it and says: "the sender told me the payload inside this packet is exactly 40 bytes."
-            * the receiver measures out exactly 40 bytes right after the IP header, and it completely ignores the 6 bytes of garbage padding (stuffing) left over at the end
+            * at the network layer, right before IP hands anything to the Ethernet hardware, the IP software looks at the chunk it is holding. it counts the bytes: 20 bytes of TCP header + 4 bytes of application data = 24 bytes
+            * the IP software adds its own 20-byte IP header to the front. inside that IP header, at the exact spot reserved for "Datagram length", the sender's OS explicitly writes the binary for the number 44 (24 + 20-byte IP header)
+            * now, the IP layer hands this 44-byte block down to the physical Ethernet card. the Ethernet card has a strict hardware rule: "the data field I am handed must be at least 46 bytes long." it looks at the IP header "Datagram Length" field and sees it's only 44 bytes.
+            * the ethernet card blindly appends 2 bytes of zero padding to the very end of the payload so it satisfies the physical wire requirements
+            * in the recieving IP layer, because the sender explicitly wrote 44 in the "Datagram Length" field, the receiver reads it and says: "the sender told me the payload inside this packet is exactly 24 bytes" (44 - 20-byte IP header)
+            * the receiver measures out exactly 24 bytes right after the IP header, and it completely ignores the 2 bytes of garbage padding (stuffing) left over at the end.
 
         (2) the destination address contains the MAC address of the destination adapter
 
